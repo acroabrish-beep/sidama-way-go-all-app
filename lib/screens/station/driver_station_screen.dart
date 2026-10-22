@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +6,8 @@ import '../../core/utils/logger.dart';
 import '../../models/station_ticket_models.dart';
 import '../../services/api/base_api_service.dart';
 import '../../services/api/station_ticket_api_service.dart';
+import '../../services/realtime_service.dart';
+import '../../widgets/realtime_indicator.dart';
 import 'station_ui.dart';
 import 'ticket_qr_scanner_screen.dart';
 import 'verification_result_card.dart';
@@ -38,21 +38,18 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
   String? _queueError;
   String? _manualError;
   VerificationOutcome? _manualOutcome;
-  Timer? _refreshTimer;
+  RealtimeService<QueueSnapshot>? _queueRealtime;
+  RealtimeStatus _queueStatus = RealtimeStatus.idle;
 
   @override
   void initState() {
     super.initState();
     _loadSetup();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (!mounted || _station == null || _loading) return;
-      _loadQueue();
-    });
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _queueRealtime?.dispose();
     _codeController.dispose();
     _api.dispose();
     super.dispose();
@@ -95,7 +92,7 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
         _loading = false;
       });
       if (station != null) {
-        await _loadQueue();
+        _restartQueuePolling();
       }
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -113,37 +110,52 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
     }
   }
 
-  Future<void> _loadQueue() async {
+  void _restartQueuePolling() {
+    _queueRealtime?.dispose();
+    _queueRealtime = null;
+    _queueStatus = RealtimeStatus.idle;
+
     final station = _station;
     if (station == null) return;
-    setState(() {
+    if (_queue == null) {
       _queueLoading = true;
-      _queueError = null;
-    });
-    try {
-      final snapshot = await _api.getQueue(
-        station.id,
-        vehicleId: _vehicle?.id,
-      );
-      if (!mounted || _station?.id != station.id) return;
-      setState(() {
-        _queue = snapshot;
-        _queueLoading = false;
-      });
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _queueError = error.message;
-        _queueLoading = false;
-      });
-    } catch (error) {
-      AppLogger.error('Queue load failed', error: error);
-      if (!mounted) return;
-      setState(() {
-        _queueError = 'Unable to load the smart queue.';
-        _queueLoading = false;
-      });
     }
+
+    final service = RealtimeService<QueueSnapshot>(
+      fetch: () => _api.getQueue(station.id, vehicleId: _vehicle?.id),
+      onData: (snapshot) {
+        if (!mounted || _station?.id != station.id) return;
+        setState(() {
+          _queue = snapshot;
+          _queueLoading = false;
+          _queueError = null;
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _queueLoading = false;
+          _queueError = error is ApiException
+              ? error.message
+              : 'Unable to load the smart queue.';
+        });
+      },
+      onStatusChanged: (status) {
+        if (!mounted) return;
+        setState(() => _queueStatus = status);
+      },
+      interval: const Duration(seconds: 5),
+    );
+    _queueRealtime = service;
+    service.start();
+  }
+
+  Future<void> _retryQueue() async {
+    if (_queueRealtime == null) {
+      _restartQueuePolling();
+      return;
+    }
+    await _queueRealtime!.refreshNow();
   }
 
   Future<void> _checkIn() async {
@@ -158,9 +170,13 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
       await _api.checkIn(stationId: station.id, vehicleId: vehicle.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${vehicle.registrationNumber} joined the smart queue.')),
+        SnackBar(
+          content: Text(
+            '${vehicle.registrationNumber} joined the smart queue.',
+          ),
+        ),
       );
-      await _loadQueue();
+      await _queueRealtime?.refreshNow();
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _queueError = error.message);
@@ -183,10 +199,10 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
     try {
       await _api.checkOut(vehicle.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vehicle left the queue.')),
-      );
-      await _loadQueue();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vehicle left the queue.')));
+      await _queueRealtime?.refreshNow();
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _queueError = error.message);
@@ -220,10 +236,7 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
       _manualOutcome = null;
     });
     try {
-      final outcome = await _api.verifyCode(
-        code: code,
-        vehicleId: vehicle.id,
-      );
+      final outcome = await _api.verifyCode(code: code, vehicleId: vehicle.id);
       if (!mounted) return;
       setState(() => _manualOutcome = outcome);
     } on ApiException catch (error) {
@@ -275,6 +288,7 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
+          RealtimeIndicator(status: _queueStatus),
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
@@ -296,7 +310,6 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
     return RefreshIndicator(
       onRefresh: () async {
         await _loadSetup();
-        await _loadQueue();
       },
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -365,7 +378,7 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
                   _manualOutcome = null;
                   _manualError = null;
                 });
-                _loadQueue();
+                _restartQueuePolling();
               },
             ),
           const SizedBox(height: 6),
@@ -402,10 +415,8 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
               value: station,
               items: _stations
                   .map(
-                    (item) => DropdownMenuItem(
-                      value: item,
-                      child: Text(item.name),
-                    ),
+                    (item) =>
+                        DropdownMenuItem(value: item, child: Text(item.name)),
                   )
                   .toList(),
               onChanged: (value) {
@@ -415,7 +426,7 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
                   _queue = null;
                   _queueError = null;
                 });
-                _loadQueue();
+                _restartQueuePolling();
               },
             ),
             const SizedBox(height: 10),
@@ -472,10 +483,7 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     _queueError!,
-                    style: TextStyle(
-                      color: Colors.red.shade800,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.red.shade800, fontSize: 12),
                   ),
                 ),
               const SizedBox(height: 10),
@@ -519,35 +527,37 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 4),
-                ...queue.nextWaitingVehicles.take(5).map(
-                  (waiting) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.directions_car,
-                          size: 16,
-                          color: Colors.grey,
+                ...queue.nextWaitingVehicles
+                    .take(5)
+                    .map(
+                      (waiting) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.directions_car,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                waiting.registrationNumber ??
+                                    'Plate not recorded',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            Text(
+                              '${waiting.vehicleType.label} · ${_timeFormat.format(waiting.checkedInAt)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            waiting.registrationNumber ??
-                                'Plate not recorded',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        Text(
-                          '${waiting.vehicleType.label} · ${_timeFormat.format(waiting.checkedInAt)}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
               ],
             ] else if (_queueError != null)
               Column(
@@ -555,13 +565,10 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
                 children: [
                   Text(
                     _queueError!,
-                    style: TextStyle(
-                      color: Colors.red.shade800,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.red.shade800, fontSize: 12),
                   ),
                   TextButton.icon(
-                    onPressed: _loadQueue,
+                    onPressed: _retryQueue,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry queue'),
                   ),

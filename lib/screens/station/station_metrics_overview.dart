@@ -4,11 +4,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/utils/logger.dart';
 import '../../models/station_ticket_models.dart';
 import '../../services/api/base_api_service.dart';
 import '../../services/api/station_ticket_api_service.dart';
+import '../../services/realtime_service.dart';
 import '../../widgets/ai_insights_card.dart';
+import '../../widgets/realtime_indicator.dart';
 import 'admin_station_catalog_screen.dart';
 import 'driver_station_screen.dart';
 import 'station_ui.dart';
@@ -26,47 +27,69 @@ class _StationMetricsOverviewState extends State<StationMetricsOverview> {
   final DateFormat _hourFormat = DateFormat('HH:mm');
 
   StationMetrics? _metrics;
+  RealtimeService<StationMetrics>? _realtime;
+  RealtimeStatus _realtimeStatus = RealtimeStatus.idle;
   String? _error;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _realtime?.dispose();
     _api.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _startPolling() {
+    _realtime?.dispose();
+    final service = RealtimeService<StationMetrics>(
+      fetch: _api.getTaxiMetrics,
+      onData: (metrics) {
+        if (!mounted) return;
+        setState(() {
+          _metrics = metrics;
+          _error = null;
+          _loading = false;
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _error = error is ApiException
+              ? error.message
+              : 'Unable to load station metrics.';
+          _loading = false;
+        });
+      },
+      onStatusChanged: (status) {
+        if (!mounted) return;
+        setState(() => _realtimeStatus = status);
+      },
+      interval: const Duration(seconds: 5),
+    );
+    _realtime = service;
+    service.start();
+  }
+
+  Future<void> _refresh() async {
+    if (_realtime == null) {
+      _startPolling();
+      return;
+    }
+    await _realtime!.refreshNow();
+  }
+
+  Future<void> _retry() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-    try {
-      final metrics = await _api.getTaxiMetrics();
-      if (!mounted) return;
-      setState(() {
-        _metrics = metrics;
-        _loading = false;
-      });
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error.message;
-        _loading = false;
-      });
-    } catch (error) {
-      AppLogger.error('Station metrics load failed', error: error);
-      if (!mounted) return;
-      setState(() {
-        _error = 'Unable to load station metrics.';
-        _loading = false;
-      });
-    }
+    await _refresh();
   }
 
   @override
@@ -74,7 +97,7 @@ class _StationMetricsOverviewState extends State<StationMetricsOverview> {
     return Container(
       color: const Color(0xFFF8F9FA),
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: _refresh,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -94,7 +117,7 @@ class _StationMetricsOverviewState extends State<StationMetricsOverview> {
               StationErrorView(
                 title: 'Metrics unavailable',
                 message: _error!,
-                onRetry: _load,
+                onRetry: _retry,
               )
             else if (_metrics != null) ...[
               if (_error != null)
@@ -144,24 +167,19 @@ class _StationMetricsOverviewState extends State<StationMetricsOverview> {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.confirmation_number,
-                  color: Color(0xFF1A237E),
-                ),
+                const Icon(Icons.confirmation_number, color: Color(0xFF1A237E)),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'Station operations',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
+                RealtimeIndicator(status: _realtimeStatus),
                 IconButton(
                   tooltip: 'Refresh metrics',
                   icon: const Icon(Icons.refresh),
-                  onPressed: _loading ? null : _load,
+                  onPressed: _loading ? null : _retry,
                 ),
               ],
             ),
@@ -331,7 +349,10 @@ class _StationMetricsOverviewState extends State<StationMetricsOverview> {
               height: 190,
               child: BarChart(
                 BarChartData(
-                  maxY: (maxTickets * 1.2).ceilToDouble().clamp(1, double.infinity),
+                  maxY: (maxTickets * 1.2).ceilToDouble().clamp(
+                    1,
+                    double.infinity,
+                  ),
                   gridData: const FlGridData(drawVerticalLine: false),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
@@ -513,27 +534,29 @@ class _StationMetricsOverviewState extends State<StationMetricsOverview> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  ...mismatches.take(10).map(
-                    (row) => ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 18,
+                  ...mismatches
+                      .take(10)
+                      .map(
+                        (row) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 18,
+                          ),
+                          title: Text(
+                            row.ticketCode ?? 'Ticket not found',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            'Payment ${row.paymentStatus} · '
+                            'ETB ${row.paymentAmountEtb?.toStringAsFixed(2) ?? '?'} · '
+                            'Ticket ${row.ticketStatus ?? 'missing'}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ),
                       ),
-                      title: Text(
-                        row.ticketCode ?? 'Ticket not found',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      subtitle: Text(
-                        'Payment ${row.paymentStatus} · '
-                        'ETB ${row.paymentAmountEtb?.toStringAsFixed(2) ?? '?'} · '
-                        'Ticket ${row.ticketStatus ?? 'missing'}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ),
                 ],
               ],
             ),

@@ -39,7 +39,10 @@ class StationReceiptService {
               ),
               pw.Text(
                 'Station ticket receipt',
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
               ),
             ],
           ),
@@ -63,16 +66,10 @@ class StationReceiptService {
             pw.SizedBox(height: 10),
           ],
           _row('Ticket code', ticket.code),
-          _row(
-            'Route',
-            route?.label ?? 'Route details unavailable',
-          ),
+          _row('Route', route?.label ?? 'Route details unavailable'),
           _row('Vehicle type', ticket.vehicleType.label),
           _row('Fare', 'ETB ${_money(ticket.fareEtb)}'),
-          _row(
-            'Tariff',
-            tariff?.label ?? 'Tariff record unavailable',
-          ),
+          _row('Tariff', tariff?.label ?? 'Tariff record unavailable'),
           if (tariff?.sourceReference != null)
             _row('Source reference', tariff!.sourceReference!),
           if (tariff?.approvedBy != null)
@@ -81,7 +78,7 @@ class StationReceiptService {
             _row(
               'Tariff effective',
               '${_dateFormat.format(tariff.effectiveFrom)}'
-              '${tariff.effectiveTo == null ? '' : ' - ${_dateFormat.format(tariff.effectiveTo!)}'}',
+                  '${tariff.effectiveTo == null ? '' : ' - ${_dateFormat.format(tariff.effectiveTo!)}'}',
             ),
           _row('Issued', _dateFormat.format(ticket.issuedAt)),
           _row('Valid until', _dateFormat.format(ticket.expiresAt)),
@@ -91,6 +88,23 @@ class StationReceiptService {
             _row('Verified vehicle', ticket.verifiedVehicleId!),
           pw.SizedBox(height: 8),
           pw.Divider(color: PdfColors.grey400),
+          if (payment?.provider == 'dev') ...[
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(8),
+              color: PdfColors.orange100,
+              child: pw.Text(
+                'DEV PAYMENT - no real money was charged. This receipt was produced '
+                'with the development payment provider.',
+                style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.orange900,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 8),
+          ],
           pw.Text(
             'Payment',
             style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
@@ -102,7 +116,12 @@ class StationReceiptService {
               style: const pw.TextStyle(fontSize: 9),
             )
           else ...[
-            _row('Provider', payment.provider),
+            _row(
+              'Provider',
+              payment.provider == 'dev'
+                  ? 'dev - DEV PAYMENT'
+                  : payment.provider,
+            ),
             if (payment.providerRef != null)
               _row('Provider reference', payment.providerRef!),
             if (payment.amountEtb != null)
@@ -147,11 +166,7 @@ class StationReceiptService {
     await SharePlus.instance.share(
       ShareParams(
         files: [
-          XFile.fromData(
-            bytes,
-            mimeType: 'application/pdf',
-            name: fileName,
-          ),
+          XFile.fromData(bytes, mimeType: 'application/pdf', name: fileName),
         ],
         fileNameOverrides: [fileName],
         subject: 'Sidama Way Go station ticket ${detail.ticket.code}',
@@ -173,10 +188,7 @@ class StationReceiptService {
             ),
           ),
           pw.Expanded(
-            child: pw.Text(
-              value,
-              style: const pw.TextStyle(fontSize: 9),
-            ),
+            child: pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
           ),
         ],
       ),

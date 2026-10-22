@@ -298,6 +298,24 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
             '${ticket.vehicleType.label} · ETB ${ticket.fareEtb.toStringAsFixed(2)}',
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
+          if ((detail.payment ?? ticket.payment)?.provider == 'dev') ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'DEV PAYMENT — no real money was charged',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
           if (isPending) ...[
             const SizedBox(height: 10),
             Text(
@@ -319,7 +337,8 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
         title: 'Boarding QR',
         icon: Icons.qr_code,
         child: Text(
-          detail.qrError ?? 'The QR code is not available yet. Refresh the ticket.',
+          detail.qrError ??
+              'The QR code is not available yet. Refresh the ticket.',
           style: const TextStyle(color: Colors.red, fontSize: 13),
         ),
       );
@@ -358,7 +377,7 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
     final payment = detail.payment;
     final isDev = payment?.provider == 'dev';
     return StationSectionCard(
-      title: 'Payment',
+      title: isDev ? 'DEV PAYMENT' : 'Payment',
       icon: Icons.payments,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,17 +543,33 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
   Widget _buildPaymentCard(TicketDetail detail) {
     final payment = detail.payment ?? detail.ticket.payment;
     if (payment == null) return const SizedBox.shrink();
+    final isDev = payment.provider == 'dev';
     return StationSectionCard(
       title: 'Payment record',
       icon: Icons.receipt,
       child: Column(
         children: [
-          StationInfoRow(label: 'Provider', value: payment.provider),
-          if (payment.providerRef != null)
-            StationInfoRow(
-              label: 'Reference',
-              value: payment.providerRef!,
+          if (isDev)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade400),
+              ),
+              child: const Text(
+                'DEV PAYMENT — no real money was charged for this ticket.',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
+          StationInfoRow(
+            label: 'Provider',
+            value: isDev ? 'dev — DEV PAYMENT' : payment.provider,
+          ),
+          if (payment.providerRef != null)
+            StationInfoRow(label: 'Reference', value: payment.providerRef!),
           if (payment.amountEtb != null)
             StationInfoRow(
               label: 'Amount',

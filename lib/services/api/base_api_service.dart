@@ -9,15 +9,21 @@ import '../../core/utils/logger.dart';
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
+  final String? code;
   final dynamic originalError;
   final dynamic data;
 
   ApiException(
     this.message, {
     this.statusCode,
+    this.code,
     this.originalError,
     this.data,
   });
+
+  bool get isUnauthorized => statusCode == 401;
+  bool get isForbidden => statusCode == 403;
+  bool get isNotFound => statusCode == 404;
 
   @override
   String toString() => message;
@@ -28,8 +34,8 @@ class BaseApiService {
   final http.Client _client;
 
   BaseApiService({http.Client? client})
-      : _baseUrl = AppConfig.apiBaseUrl,
-        _client = client ?? http.Client();
+    : _baseUrl = AppConfig.apiBaseUrl,
+      _client = client ?? http.Client();
 
   String get baseUrl => _baseUrl;
 
@@ -58,10 +64,14 @@ class BaseApiService {
     } on TimeoutException {
       throw ApiException('Request timeout. Please check your connection.');
     } on SocketException {
-      throw ApiException('Cannot reach the server. Please check your internet or server status.');
+      throw ApiException(
+        'Cannot reach the server. Please check your internet or server status.',
+      );
     } on http.ClientException catch (e) {
       if (e.message.contains('Failed to fetch')) {
-        throw ApiException('Connection failed. This may be a CORS issue or the server is down.');
+        throw ApiException(
+          'Connection failed. This may be a CORS issue or the server is down.',
+        );
       }
       throw ApiException('Network error: ${e.message}');
     } catch (e) {
@@ -75,6 +85,7 @@ class BaseApiService {
     String endpoint, {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
       final uri = Uri.parse('$_baseUrl$endpoint');
@@ -88,18 +99,25 @@ class BaseApiService {
           body: body != null ? jsonEncode(body) : null,
         ),
         headers,
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(timeout);
 
       _logResponse(response);
       _handleResponseError(response);
       return response;
     } on TimeoutException {
-      throw ApiException('Request timeout. Please try again.');
+      throw ApiException(
+        'Request timeout. Please try again.',
+        code: 'network_timeout',
+      );
     } on SocketException {
-      throw ApiException('Server unreachable. Please check if the backend is running.');
+      throw ApiException(
+        'Server unreachable. Please check if the backend is running.',
+      );
     } on http.ClientException catch (e) {
       if (e.message.contains('Failed to fetch')) {
-        throw ApiException('Failed to connect to the backend. Ensure the server is running on port 3000 and CORS is enabled.');
+        throw ApiException(
+          'Failed to connect to the backend. Ensure the server is running on port 3000 and CORS is enabled.',
+        );
       }
       throw ApiException('Network error: ${e.message}');
     } catch (e) {
@@ -230,6 +248,7 @@ class BaseApiService {
         throw ApiException(
           data['message'] ?? data['error'] ?? 'Invalid request',
           statusCode: response.statusCode,
+          code: data['code']?.toString(),
           data: data,
         );
       } catch (e) {
@@ -242,10 +261,12 @@ class BaseApiService {
     } else if (response.statusCode >= 500) {
       try {
         final data = jsonDecode(response.body);
-        if (data is Map && data['error'] is String) {
+        if (data is Map &&
+            (data['error'] is String || data['message'] is String)) {
           throw ApiException(
-            data['error'] as String,
+            (data['message'] ?? data['error']) as String,
             statusCode: response.statusCode,
+            code: data['code']?.toString(),
             data: data,
           );
         }

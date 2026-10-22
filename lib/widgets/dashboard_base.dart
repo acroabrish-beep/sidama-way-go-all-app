@@ -6,6 +6,7 @@ import '../screens/splash_screen.dart';
 import '../screens/user_management_screen.dart';
 import '../screens/crud_list_screen.dart';
 import '../screens/ai_assistant_screen.dart';
+import '../screens/citizen_reports_admin_screen.dart';
 
 class DashboardBase extends StatelessWidget {
   final String title;
@@ -29,7 +30,13 @@ class DashboardBase extends StatelessWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -38,7 +45,10 @@ class DashboardBase extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.smart_toy_outlined),
             tooltip: 'Ask AI',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AiAssistantScreen()),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -87,38 +97,63 @@ class DashboardBase extends StatelessWidget {
                   colors: [Color(0xFF1A237E), Color(0xFF283593)],
                 ),
               ),
-              accountName: Text(user?.fullName ?? 'Admin', style: const TextStyle(fontWeight: FontWeight.bold)),
-              accountEmail: const Text('SIDAMA WAY GO – Smart City Digital Platform', style: TextStyle(fontSize: 10, color: Colors.white70)),
+              accountName: Text(
+                user?.fullName ?? 'Admin',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              accountEmail: const Text(
+                'SIDAMA WAY GO – Smart City Digital Platform',
+                style: TextStyle(fontSize: 10, color: Colors.white70),
+              ),
               currentAccountPicture: CircleAvatar(
                 backgroundColor: Colors.white,
                 child: Text(
                   user?.fullName.isNotEmpty == true ? user!.fullName[0] : 'A',
-                  style: const TextStyle(fontSize: 40.0, color: Color(0xFF1A237E)),
+                  style: const TextStyle(
+                    fontSize: 40.0,
+                    color: Color(0xFF1A237E),
+                  ),
                 ),
               ),
             ),
-            _drawerItem(context, 'Dashboard', Icons.dashboard, () => Navigator.pop(context)),
+            _drawerItem(
+              context,
+              'Dashboard',
+              Icons.dashboard,
+              () => Navigator.pop(context),
+            ),
             if (user?.role == UserRole.superAdmin) ...[
               const Divider(color: Colors.white24),
               _drawerItem(context, 'User Management', Icons.people, () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const UserManagementScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const UserManagementScreen(),
+                  ),
+                );
               }),
               _drawerItem(context, 'Citizen Reports', Icons.report_problem, () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => CRUDListScreen(
-                  collection: 'citizen_reports',
-                  title: 'Citizen Reports',
-                  fields: ['category', 'status', 'description', 'location', 'userName'],
-                )));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CitizenReportsAdminScreen(),
+                  ),
+                );
               }),
               _drawerItem(context, 'Audit Logs', Icons.history, () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => CRUDListScreen(
-                  collection: 'audit_logs',
-                  title: 'Audit Logs',
-                  fields: ['action', 'user', 'timestamp', 'details'],
-                )));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CRUDListScreen(
+                      collection: 'audit_logs',
+                      title: 'Audit Logs',
+                      fields: ['action', 'user', 'timestamp', 'details'],
+                    ),
+                  ),
+                );
               }),
               _drawerItem(context, 'System Logs', Icons.list_alt, () {}),
             ],
@@ -131,7 +166,12 @@ class DashboardBase extends StatelessWidget {
     );
   }
 
-  Widget _drawerItem(BuildContext context, String title, IconData icon, VoidCallback onTap) {
+  Widget _drawerItem(
+    BuildContext context,
+    String title,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return ListTile(
       leading: Icon(icon, color: Colors.white),
       title: Text(title, style: const TextStyle(color: Colors.white)),

@@ -1,10 +1,48 @@
 import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../../models/citizen_report_model.dart';
 import 'base_api_service.dart';
-import '../../core/utils/logger.dart';
+
+class ReportsPage {
+  const ReportsPage({required this.reports, required this.serverTime});
+
+  final List<CitizenReport> reports;
+  final DateTime serverTime;
+}
 
 class CitizenReportingApiService extends BaseApiService {
-  /// Create a new citizen report
-  Future<Map<String, dynamic>> createReport({
+  Map<String, dynamic> _json(http.Response response) {
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw ApiException('Unexpected server response');
+  }
+
+  CitizenReport _report(Map<String, dynamic> data) {
+    final report = data['report'];
+    if (report is! Map<String, dynamic>) {
+      throw ApiException('The server did not return the saved report.');
+    }
+    return CitizenReport.fromMap(report, report['id'].toString());
+  }
+
+  ReportsPage _page(Map<String, dynamic> data) {
+    final rawReports = data['reports'];
+    final reports = rawReports is List
+        ? rawReports
+              .whereType<Map<String, dynamic>>()
+              .map((item) => CitizenReport.fromMap(item, item['id'].toString()))
+              .toList(growable: false)
+        : const <CitizenReport>[];
+    final serverTime = DateTime.tryParse(data['serverTime']?.toString() ?? '');
+    return ReportsPage(
+      reports: reports,
+      serverTime: (serverTime ?? DateTime.now()).toUtc(),
+    );
+  }
+
+  Future<CitizenReport> createReport({
     required String firebaseUid,
     required String category,
     String? description,
@@ -12,69 +50,73 @@ class CitizenReportingApiService extends BaseApiService {
     required double latitude,
     required double longitude,
   }) async {
-    try {
-      final body = <String, dynamic>{
+    final response = await post(
+      '/api/citizen-reporting',
+      body: {
         'firebaseUid': firebaseUid,
         'category': category,
         'latitude': latitude,
         'longitude': longitude,
-      };
-
-      if (description != null && description.isNotEmpty) {
-        body['description'] = description;
-      }
-
-      if (photoUrl != null && photoUrl.isNotEmpty) {
-        body['photoUrl'] = photoUrl;
-      }
-
-      AppLogger.info('POST createReport request - Endpoint: /api/citizen-reporting');
-      AppLogger.info('POST createReport body - firebaseUid: $firebaseUid, category: $category');
-
-      final response = await post(
-        '/api/citizen-reporting',
-        body: body,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+        if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+      },
+    );
+    if (response.statusCode != 201) {
+      throw ApiException(
+        'Failed to create report: ${response.statusCode}',
+        statusCode: response.statusCode,
       );
-
-      AppLogger.info('POST createReport response - HTTP Status: ${response.statusCode}');
-
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        final report = data['report'] as Map<String, dynamic>;
-        AppLogger.info('Report created successfully - ID: ${report['id']}');
-        return report;
-      } else {
-        AppLogger.error('Create Report Error: ${response.statusCode}');
-        throw Exception('Failed to create report: ${response.statusCode}');
-      }
-    } catch (e) {
-      AppLogger.error('Create report failed', error: e);
-      rethrow;
     }
+    return _report(_json(response));
   }
 
-  /// Get the current user's reports
-  Future<List<Map<String, dynamic>>> getMyReports(String firebaseUid) async {
-    try {
-      AppLogger.info('GET myReports request - firebaseUid: $firebaseUid');
+  Future<ReportsPage> getMyReports({
+    required String firebaseUid,
+    DateTime? updatedSince,
+  }) async {
+    final response = await get(
+      '/api/citizen-reporting',
+      queryParams: {
+        'firebaseUid': firebaseUid,
+        'updatedSince': ?updatedSince?.toUtc().toIso8601String(),
+      },
+    );
+    return _page(_json(response));
+  }
 
-      final response = await get(
-        '/api/citizen-reporting',
-        queryParams: {'firebaseUid': firebaseUid},
-      );
+  Future<ReportsPage> getReportsForAdmin({
+    required String adminFirebaseUid,
+    String? status,
+    DateTime? updatedSince,
+  }) async {
+    final response = await get(
+      '/api/citizen-reporting',
+      queryParams: {
+        'admin': 'true',
+        'adminFirebaseUid': adminFirebaseUid,
+        'status': ?status,
+        'updatedSince': ?updatedSince?.toUtc().toIso8601String(),
+      },
+    );
+    return _page(_json(response));
+  }
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final reports = data['reports'] as List<dynamic>;
-        AppLogger.info('Retrieved ${reports.length} reports for user');
-        return reports.cast<Map<String, dynamic>>();
-      } else {
-        AppLogger.error('Get My Reports Error: ${response.statusCode}');
-        throw Exception('Failed to get reports: ${response.statusCode}');
-      }
-    } catch (e) {
-      AppLogger.error('Get my reports failed', error: e);
-      rethrow;
-    }
+  Future<CitizenReport> updateReport({
+    required String reportId,
+    String? status,
+    String? finalCategory,
+    String? finalUrgency,
+  }) async {
+    final response = await patch(
+      '/api/citizen-reporting',
+      body: {
+        'reportId': reportId,
+        'status': ?status,
+        'finalCategory': ?finalCategory,
+        'finalUrgency': ?finalUrgency,
+      },
+    );
+    return _report(_json(response));
   }
 }

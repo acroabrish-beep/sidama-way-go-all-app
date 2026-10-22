@@ -1,10 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-enum ReportStatus {
-  pending,
-  inProgress,
-  resolved,
-}
+enum ReportStatus { pending, inProgress, resolved }
 
 class CitizenReport {
   final String id;
@@ -17,6 +11,14 @@ class CitizenReport {
   final ReportStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? aiStatus;
+  final String? aiCategory;
+  final String? aiUrgency;
+  final String? aiSummary;
+  final String? aiLanguage;
+  final double? aiConfidence;
+  final String? finalCategory;
+  final String? finalUrgency;
 
   CitizenReport({
     required this.id,
@@ -29,12 +31,20 @@ class CitizenReport {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.aiStatus,
+    this.aiCategory,
+    this.aiUrgency,
+    this.aiSummary,
+    this.aiLanguage,
+    this.aiConfidence,
+    this.finalCategory,
+    this.finalUrgency,
   });
 
   /// Normalizes category string to match backend enum values
   static String normalizeCategory(String category) {
     final c = category.toLowerCase().trim();
-    
+
     if (c.contains('road') || c.contains('damage') || c.contains('pothole')) {
       return 'pothole';
     }
@@ -47,14 +57,63 @@ class CitizenReport {
     if (c.contains('water') || c.contains('leak') || c.contains('pipe')) {
       return 'water';
     }
-    
+
     return 'other';
+  }
+
+  static const List<String> categories = [
+    'pothole',
+    'garbage',
+    'street_light',
+    'water',
+    'other',
+  ];
+
+  static String categoryLabel(String? value) {
+    switch (value) {
+      case 'pothole':
+        return 'Road damage';
+      case 'garbage':
+        return 'Waste';
+      case 'street_light':
+        return 'Street light';
+      case 'water':
+        return 'Water';
+      default:
+        return 'Other';
+    }
+  }
+
+  static String urgencyLabel(String? value) {
+    switch (value) {
+      case 'high':
+        return 'High urgency';
+      case 'medium':
+        return 'Medium urgency';
+      case 'low':
+        return 'Low urgency';
+      default:
+        return 'Not triaged';
+    }
+  }
+
+  static String languageLabel(String? value) {
+    switch (value) {
+      case 'am':
+        return 'Amharic';
+      case 'en':
+        return 'English';
+      case 'sid':
+        return 'Sidaamu Afoo';
+      default:
+        return 'Other language';
+    }
   }
 
   /// Maps backend status string to ReportStatus enum
   static ReportStatus parseStatus(String? status) {
     if (status == null) return ReportStatus.pending;
-    
+
     switch (status.toLowerCase()) {
       case 'pending':
         return ReportStatus.pending;
@@ -91,27 +150,26 @@ class CitizenReport {
       status: parseStatus(map['status']?.toString()),
       createdAt: _parseDateTime(map['created_at']) ?? DateTime.now(),
       updatedAt: _parseDateTime(map['updated_at']) ?? DateTime.now(),
+      aiStatus: map['ai_status']?.toString(),
+      aiCategory: map['ai_category']?.toString(),
+      aiUrgency: map['ai_urgency']?.toString(),
+      aiSummary: map['ai_summary']?.toString(),
+      aiLanguage: map['ai_language']?.toString(),
+      aiConfidence: (map['ai_confidence'] as num?)?.toDouble(),
+      finalCategory: map['final_category']?.toString(),
+      finalUrgency: map['final_urgency']?.toString(),
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'reporter_firebase_uid': reporterFirebaseUid,
-      'category': category,
-      'description': description,
-      'photo_url': photoUrl,
-      'latitude': latitude,
-      'longitude': longitude,
-      'status': statusToString(status),
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
+  String get effectiveCategory => finalCategory ?? aiCategory ?? category;
+
+  String? get effectiveUrgency => finalUrgency ?? aiUrgency;
+
+  bool get hasAiSummary => aiSummary != null && aiSummary!.trim().isNotEmpty;
 
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
-    if (value is Timestamp) return value.toDate();
     if (value is String) return DateTime.tryParse(value);
     return null;
   }

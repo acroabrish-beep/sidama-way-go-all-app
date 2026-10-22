@@ -37,6 +37,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
+    // Session restoration is asynchronous (profile fetch over the network).
+    // Wait for it instead of trusting the fixed delay, otherwise a signed-in
+    // user can be routed to Login on a slow connection. Bounded so the app
+    // never hangs on the splash screen.
+    final deadline = DateTime.now().add(const Duration(seconds: 8));
+    while (authProvider.isLoading && mounted && DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted) return;
+
     if (authProvider.isAuthenticated) {
       final user = authProvider.userModel;
       if (user != null) {

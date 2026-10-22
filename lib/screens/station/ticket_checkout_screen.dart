@@ -188,7 +188,9 @@ class _TicketCheckoutScreenState extends State<TicketCheckoutScreen> {
                       color: Colors.white,
                     ),
                   )
-                : Text('Pay ETB ${tariff.fareEtb.toStringAsFixed(2)}'),
+                : Text(
+                    'Continue to payment · ETB ${tariff.fareEtb.toStringAsFixed(2)}',
+                  ),
           ),
           const SizedBox(height: 16),
         ],

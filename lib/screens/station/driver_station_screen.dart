@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -240,6 +241,20 @@ class _DriverStationScreenState extends State<DriverStationScreen> {
   void _openScanner() {
     final vehicle = _vehicle;
     if (vehicle == null) return;
+    // mobile_scanner has no Windows/Linux implementation; point at the
+    // manual ticket-code check instead of a camera screen that cannot start.
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Camera QR scanning needs the Android app. Use ticket code verification below.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(

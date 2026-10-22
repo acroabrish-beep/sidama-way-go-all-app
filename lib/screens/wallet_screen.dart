@@ -205,9 +205,9 @@ class WalletScreen extends StatelessWidget {
           children: [
             const Text('Choose Payment Method', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            _methodTile('Telebirr', 'assets/images/telebirr.png', Colors.blue),
-            _methodTile('CBE Birr', 'assets/images/cbe.png', Colors.purple),
-            _methodTile('Chapa (Card/Other)', 'assets/images/chapa.png', Colors.green),
+            _methodTile(context, 'Telebirr', 'assets/images/telebirr.png', Colors.blue),
+            _methodTile(context, 'CBE Birr', 'assets/images/cbe.png', Colors.purple),
+            _methodTile(context, 'Chapa (Card/Other)', 'assets/images/chapa.png', Colors.green),
             const SizedBox(height: 20),
           ],
         ),
@@ -215,7 +215,7 @@ class WalletScreen extends StatelessWidget {
     );
   }
 
-  Widget _methodTile(String name, String asset, Color color) {
+  Widget _methodTile(BuildContext context, String name, String asset, Color color) {
     return ListTile(
       leading: Container(
         width: 40,
@@ -225,7 +225,15 @@ class WalletScreen extends StatelessWidget {
       ),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$name top-up is not connected yet. Top-ups require a live payment provider configured on the server.',
+            ),
+          ),
+        );
+      },
     );
   }
 }

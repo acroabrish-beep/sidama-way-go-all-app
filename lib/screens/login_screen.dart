@@ -51,6 +51,7 @@ class LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       AppLogger.error('Login screen error', error: e);
+      if (!mounted) return;
       setState(
         () => _errorMessage = e.toString().contains('Exception:')
             ? e.toString().split('Exception:').last
@@ -132,7 +133,9 @@ class LoginScreenState extends State<LoginScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(30),
-            child: Card(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -176,6 +179,9 @@ class LoginScreenState extends State<LoginScreen> {
                     TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) =>
+                          authProvider.isLoading ? null : _login(),
                       decoration: InputDecoration(
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock),
@@ -238,7 +244,7 @@ class LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text("Don't have an account?"),
+                        const Flexible(child: Text("Don't have an account?")),
                         TextButton(
                           onPressed: () => Navigator.push(
                             context,
@@ -256,6 +262,7 @@ class LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart' as custom_auth;
-import '../models/user_model.dart';
 import 'terminal_screen.dart';
 import 'smart_city_map_screen.dart';
 import 'profile_screen.dart';
@@ -17,12 +15,16 @@ import 'wallet_screen.dart';
 import 'settings_screen.dart';
 import 'eco_shine_screen.dart';
 import 'ai_assistant_screen.dart';
+import 'taxi_demo_screen.dart';
 import '../utils/language_provider.dart';
 
 import 'digital_id_screen.dart';
 import 'citizen_reporting_screen.dart';
 import 'hotel_screen.dart';
 import 'notifications_screen.dart';
+import '../models/user_model.dart';
+import 'station/driver_station_screen.dart';
+import 'station/station_tickets_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -79,11 +81,19 @@ class _MainHub extends StatelessWidget {
     final authProvider = Provider.of<custom_auth.AuthProvider>(context);
     final user = authProvider.userModel;
     final lang = Provider.of<LanguageProvider>(context);
+    final isStationOperator =
+        user?.role == UserRole.taxiDriver ||
+        user?.role == UserRole.taxiAdmin ||
+        user?.role == UserRole.superAdmin;
 
     final List<Map<String, dynamic>> services = [
       {'title': lang.t('city_map'), 'icon': Icons.map, 'color': 0xFF1976D2, 'screen': const SmartCityMapScreen()},
       {'title': lang.t('bus_terminal'), 'icon': Icons.directions_bus_filled, 'color': 0xFF1565C0, 'screen': const TerminalScreen()},
       {'title': lang.t('city_taxi'), 'icon': Icons.local_taxi, 'color': 0xFFE65100, 'screen': const CityTaxiScreen()},
+      {'title': 'Station Tickets', 'icon': Icons.confirmation_number, 'color': 0xFF00695C, 'screen': const StationTicketsScreen()},
+      if (isStationOperator)
+        {'title': 'Driver Station', 'icon': Icons.qr_code_scanner, 'color': 0xFF1B5E20, 'screen': const DriverStationScreen()},
+      {'title': 'Taxi Demo', 'icon': Icons.play_circle_fill, 'color': 0xFFD32F2F, 'screen': const TaxiDemoScreen()},
       {'title': lang.t('emergency'), 'icon': Icons.emergency, 'color': 0xFFC62828, 'screen': const EmergencyScreen()},
       {'title': lang.t('tourist_guide'), 'icon': Icons.map, 'color': 0xFF00897B, 'screen': const TourismHomeScreen()},
       {'title': 'Hotels', 'icon': Icons.hotel, 'color': 0xFF6A1B9A, 'screen': const HotelScreen()},
@@ -168,7 +178,7 @@ class _MainHub extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Color(s['color']).withOpacity(0.1),
+                                color: Color(s['color']).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(s['icon'], color: Color(s['color']), size: 28),
@@ -188,7 +198,7 @@ class _MainHub extends StatelessWidget {
                   Text(lang.t('announcements'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('announcements').orderBy('timestamp', descending: true).limit(5).snapshots(),
+                    stream: FirebaseFirestore.instance.collection('announcements').orderBy('timestamp', descending: true).limit(3).snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) return const SizedBox();
                       return Column(
@@ -241,8 +251,8 @@ class _MainHub extends StatelessWidget {
                   final d = docs[i].data() as Map<String, dynamic>? ?? {};
                   final color = _getCategoryColor(d['category'] as String?);
                   return Card(
-                    color: color.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: color.withOpacity(0.3))),
+                    color: color.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: color.withValues(alpha: 0.3))),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
@@ -273,37 +283,30 @@ class _MainHub extends StatelessWidget {
   }
 
   Widget _buildNotificationIcon(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final authProvider = Provider.of<custom_auth.AuthProvider>(context);
+    final user = authProvider.userModel;
     if (user == null) return const SizedBox.shrink();
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('user_notifications')
-          .where('userId', isEqualTo: user.uid)
-          .where('isRead', isEqualTo: false)
-          .snapshots(),
-      builder: (context, snapshot) {
-        int unreadCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
-        return Stack(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_none),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+    int unreadCount = user.unreadNotifications;
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.notifications_none),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+        ),
+        if (unreadCount > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center),
             ),
-            if (unreadCount > 0)
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                  child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center),
-                ),
-              )
-          ],
-        );
-      },
+          )
+      ],
     );
   }
 
@@ -320,7 +323,7 @@ class _MainHub extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(Icons.campaign, color: color)),
+        leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.1), child: Icon(Icons.campaign, color: color)),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(desc),
       ),

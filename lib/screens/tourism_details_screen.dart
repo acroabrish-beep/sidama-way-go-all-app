@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../utils/language_provider.dart';
 import 'book_ride_screen.dart';
 
 class Attraction {
@@ -42,8 +40,6 @@ class TourismDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lang = Provider.of<LanguageProvider>(context);
-
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -60,7 +56,11 @@ class TourismDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     attraction.fullDescription,
-                    style: const TextStyle(fontSize: 16, height: 1.6, color: Colors.black87),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.6,
+                      color: Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   _buildGallery(context),
@@ -108,9 +108,9 @@ class TourismDetailsScreen extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withValues(alpha: 0.4),
                     Colors.transparent,
-                    Colors.black.withOpacity(0.7),
+                    Colors.black.withValues(alpha: 0.7),
                   ],
                 ),
               ),
@@ -119,7 +119,10 @@ class TourismDetailsScreen extends StatelessWidget {
         ),
         title: Text(
           attraction.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
       leading: CircleAvatar(
@@ -147,7 +150,11 @@ class TourismDetailsScreen extends StatelessWidget {
               ),
               child: Text(
                 attraction.category.toUpperCase(),
-                style: TextStyle(color: Colors.green.shade800, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.green.shade800,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -157,7 +164,10 @@ class TourismDetailsScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   attraction.rating.toString(),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -180,7 +190,11 @@ class TourismDetailsScreen extends StatelessWidget {
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Text(
       title,
-      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF2E7D32),
+      ),
     );
   }
 
@@ -232,9 +246,17 @@ class TourismDetailsScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildInfoRow(Icons.access_time, 'Opening Hours', attraction.openingHours),
+          _buildInfoRow(
+            Icons.access_time,
+            'Opening Hours',
+            attraction.openingHours,
+          ),
           const Divider(height: 32),
-          _buildInfoRow(Icons.calendar_month, 'Best Time to Visit', attraction.bestTime),
+          _buildInfoRow(
+            Icons.calendar_month,
+            'Best Time to Visit',
+            attraction.bestTime,
+          ),
           const Divider(height: 32),
           _buildInfoRow(Icons.location_on, 'Location', attraction.location),
         ],
@@ -250,8 +272,14 @@ class TourismDetailsScreen extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
       ],
@@ -264,17 +292,21 @@ class TourismDetailsScreen extends StatelessWidget {
       children: [
         _buildSectionTitle(context, 'Travel Tips'),
         const SizedBox(height: 12),
-        ...attraction.tips.map((tip) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 20),
-              const SizedBox(width: 12),
-              Expanded(child: Text(tip, style: const TextStyle(fontSize: 15))),
-            ],
+        ...attraction.tips.map(
+          (tip) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(tip, style: const TextStyle(fontSize: 15)),
+                ),
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -287,11 +319,15 @@ class TourismDetailsScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
-          children: attraction.nearby.map((place) => Chip(
-            label: Text(place),
-            backgroundColor: Colors.white,
-            side: BorderSide(color: Colors.green.shade100),
-          )).toList(),
+          children: attraction.nearby
+              .map(
+                (place) => Chip(
+                  label: Text(place),
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: Colors.green.shade100),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -302,14 +338,19 @@ class TourismDetailsScreen extends StatelessWidget {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookRideScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BookRideScreen()),
+            ),
             icon: const Icon(Icons.local_taxi),
             label: const Text('BOOK RIDE'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E7D32),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           ),
         ),

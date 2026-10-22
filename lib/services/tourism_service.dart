@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/tourism_models.dart';
+import '../models/city_os_models.dart';
 
 class TourismService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;

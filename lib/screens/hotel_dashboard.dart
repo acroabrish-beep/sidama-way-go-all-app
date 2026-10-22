@@ -2,45 +2,64 @@ import 'package:flutter/material.dart';
 import '../widgets/dashboard_base.dart';
 import '../widgets/glass_card.dart';
 import 'crud_list_screen.dart';
+import '../widgets/ai_insights_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/city_os_models.dart';
+
+import '../widgets/role_protected_widget.dart';
+import '../models/user_model.dart';
 
 class HotelDashboard extends StatelessWidget {
   const HotelDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DashboardBase(
-      title: 'Hotel Admin',
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CRUDListScreen(collection: 'hotels', title: 'Hotels', fields: ['name', 'location', 'rating', 'description']))),
-        backgroundColor: Colors.purpleAccent,
-        child: const Icon(Icons.add_home, color: Colors.white),
-      ),
-      children: [
-        _buildSummary(),
-        const SizedBox(height: 24),
-        const Text(
-          'Active Bookings',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+    return RoleProtectedWidget(
+      allowedRoles: const [UserRole.superAdmin, UserRole.hotelAdmin],
+      child: DashboardBase(
+        title: 'Hotel Admin',
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CRUDListScreen(collection: 'hotels', title: 'Hotels', fields: ['name', 'location', 'rating', 'description']))),
+          backgroundColor: Colors.purpleAccent,
+          child: const Icon(Icons.add_home, color: Colors.white),
         ),
-        const SizedBox(height: 16),
-        _buildBookingList(),
-      ],
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16.0),
+            child: AIInsightsCard(dashboardContext: 'hotel', title: '🤖 Hotel AI Insights'),
+          ),
+          _buildSummary(),
+          const SizedBox(height: 24),
+          const Text(
+            'Active Bookings',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          _buildBookingList(),
+        ],
+      ),
     );
   }
 
   Widget _buildSummary() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      children: [
-        _buildStatCard('Total Hotels', '8', Icons.hotel, Colors.purpleAccent),
-        _buildStatCard('Revenue', '140k', Icons.attach_money, Colors.greenAccent),
-      ],
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection(CityOSCollection.analytics).doc('hotel').snapshots(),
+      builder: (context, snapshot) {
+        final stats = snapshot.hasData ? HotelSummaryStats.fromFirestore(snapshot.data!) : null;
+
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          children: [
+            _buildStatCard('Total Hotels', stats?.totalHotels.toString() ?? '...', Icons.hotel, Colors.purpleAccent),
+            _buildStatCard('Revenue', '${(stats?.totalRevenue ?? 0 / 1000).toStringAsFixed(1)}k', Icons.attach_money, Colors.greenAccent),
+          ],
+        );
+      }
     );
   }
 

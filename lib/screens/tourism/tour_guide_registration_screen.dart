@@ -36,7 +36,7 @@ class _TourGuideRegistrationScreenState extends State<TourGuideRegistrationScree
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Card(
-                color: Colors.teal.withOpacity(0.05),
+                color: Colors.teal.withValues(alpha: 0.05),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: const Padding(
                   padding: EdgeInsets.all(16.0),

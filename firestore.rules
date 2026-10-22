@@ -1,38 +1,116 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Public read for baseline city data
-    match /announcements/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /hospitals/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /pharmacies/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /medicines/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /tourism_sites/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /hotels/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /restaurants/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /menu_items/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /terminal_routes/{doc} { allow read: if true; allow write: if request.auth != null; }
 
-    // Authenticated user transactions
-    match /bookings/{doc} { allow read, write: if request.auth != null; }
-    match /taxi_requests/{doc} { allow read, write: if request.auth != null; }
-    match /taxi_payments/{doc} { allow read, write: if request.auth != null; }
-    match /hotel_reservations/{doc} { allow read, write: if request.auth != null; }
-    match /appointments/{doc} { allow read, write: if request.auth != null; }
-    match /medicine_orders/{doc} { allow read, write: if request.auth != null; }
-    match /food_orders/{doc} { allow read, write: if request.auth != null; }
-    match /sos_requests/{doc} { allow read, write: if request.auth != null; }
-
-    match /user_notifications/{doc} {
-      allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null;
+    // HELPER FUNCTIONS
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRole() == 'superAdmin';
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && getUserRole() == role;
+    }
+
+    // USER PROFILES
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow delete: if isSuperAdmin();
     }
 
-    // Admin & System Collections
-    match /drivers/{doc} { allow read, write: if request.auth != null; }
-    match /audit_logs/{doc} { allow read: if request.auth != null; allow create: if request.auth != null; }
+    // CITY STATIC DATA (Baseline)
+    match /taxi_stations/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('taxiAdmin'); }
+    match /popular_destinations/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('taxiAdmin'); }
+    match /terminal_routes/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin'); }
+    match /bus_routes/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin'); }
+    match /tourism_sites/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('tourismAdmin'); }
+    match /tourism_places/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('tourismAdmin'); }
+    match /hotels/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('hotelAdmin'); }
+    match /hospitals/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('healthAdmin'); }
+    match /pharmacies/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('pharmacyAdmin'); }
+    match /food_vendors/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('businessAdmin'); }
+    match /eco_shine_locations/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
+    match /announcements/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('emergencyAdmin'); }
+
+    // DYNAMIC OPERATIONS
+
+    // Drivers & Vehicles
+    match /drivers/{driverId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == driverId;
+      allow update: if isAuthenticated() && (request.auth.uid == driverId || isSuperAdmin() || hasRole('taxiAdmin'));
+    }
+    match /vehicles/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin'); }
+    match /buses/{doc} { allow read: if true; allow write: if isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin'); }
+
+    // Bookings, Tickets, and Orders
+    match /bookings/{doc} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin'));
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin');
+    }
+    match /tickets/{doc} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin'));
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin() || hasRole('oldTerminalAdmin') || hasRole('newTerminalAdmin');
+    }
+    match /hotel_bookings/{doc} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isSuperAdmin() || hasRole('hotelAdmin'));
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin() || hasRole('hotelAdmin');
+    }
+    match /food_orders/{doc} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isSuperAdmin() || hasRole('businessAdmin'));
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin() || hasRole('businessAdmin');
+    }
+
+    // Ride Requests
+    match /ride_requests/{doc} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || request.auth.uid == resource.data.driverId || isSuperAdmin() || hasRole('taxiAdmin'));
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || request.auth.uid == resource.data.driverId || isSuperAdmin() || hasRole('taxiAdmin'));
+    }
+
+    // Emergency SOS
+    match /emergency_requests/{doc} {
+      allow read: if isSuperAdmin() || hasRole('emergencyAdmin');
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin() || hasRole('emergencyAdmin');
+    }
+    match /emergency_alerts/{doc} {
+      allow read: if isSuperAdmin() || hasRole('emergencyAdmin') || hasRole('taxiAdmin');
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin() || hasRole('emergencyAdmin');
+    }
+
+    // Analytics & System
+    match /analytics/{doc} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Cloud Functions only
+    }
+    match /audit_logs/{doc} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuthenticated();
+    }
+    match /payments/{doc} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isSuperAdmin());
+      allow create: if isAuthenticated();
+    }
+
+    // Notifications
+    match /notifications/{doc} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+    }
   }
 }

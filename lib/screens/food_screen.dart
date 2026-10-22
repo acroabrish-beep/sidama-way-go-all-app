@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -17,7 +18,8 @@ class _FoodScreenState extends State<FoodScreen> {
   @override
   void initState() {
     super.initState();
-    _seedRestaurants();
+    // Demo seeding is debug-only.
+    if (kDebugMode) _seedRestaurants();
   }
 
   Future<void> _seedRestaurants() async {
@@ -124,7 +126,7 @@ class _FoodScreenState extends State<FoodScreen> {
                             height: 120,
                             width: double.infinity,
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.2),
+                              color: color.withValues(alpha: 0.2),
                               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                             ),
                             child: Stack(

@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Sidama Way Go (Debug)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=GEMINI_API_KEY=YOUR_KEY"
+      ]
+    },
+    {
+      "name": "Sidama Way Go (Release)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "args": [
+        "--dart-define=GEMINI_API_KEY=YOUR_KEY"
+      ]
+    }
+  ]
+}

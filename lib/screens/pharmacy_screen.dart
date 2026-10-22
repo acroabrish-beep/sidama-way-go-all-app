@@ -28,7 +28,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
                 hintText: 'Search medicines...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               ),
             ),
@@ -120,7 +120,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
                 'userId': user?.uid,
                 'createdAt': FieldValue.serverTimestamp(),
               });
-              if (!mounted) return;
+              if (!context.mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order placed!')));
             },
@@ -152,18 +152,6 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
             child: const Text('CHOOSE FILE'),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPharmacyCard(String name, String info) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.local_pharmacy, color: Colors.white)),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(info),
-        trailing: const Icon(Icons.shopping_cart_outlined, size: 20),
       ),
     );
   }

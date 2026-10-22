@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/mobility_provider.dart';
 import '../../models/mobility_models.dart';
+import '../../models/city_os_models.dart';
 import 'ticket_view_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -19,8 +20,10 @@ class _BusTerminalScreenState extends State<BusTerminalScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        context.read<MobilityProvider>().fetchBusRoutes('old_terminal'));
+    Future.microtask(() {
+      if (!mounted) return;
+      context.read<MobilityProvider>().fetchBusRoutes('old_terminal');
+    });
   }
 
   @override
@@ -96,8 +99,8 @@ class _BusTerminalScreenState extends State<BusTerminalScreen> {
       qrData: 'TICKET-${DateTime.now().millisecondsSinceEpoch}',
     );
 
-    final ticketId = await context.read<MobilityProvider>().bookBusTicket(ticket);
-    if (!mounted) return;
+    await context.read<MobilityProvider>().bookBusTicket(ticket);
+    if (!context.mounted) return;
 
     Navigator.push(
       context,

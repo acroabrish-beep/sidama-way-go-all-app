@@ -39,7 +39,7 @@ class LocationProvider with ChangeNotifier {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.8), borderRadius: BorderRadius.circular(4)),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(4)),
               child: Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
             ),
             Icon(Icons.location_on, color: color, size: 40),
@@ -62,11 +62,17 @@ class LocationProvider with ChangeNotifier {
 
         if (type == 'taxi') {
           color = Colors.yellow;
-        } else if (type == 'bus') color = Colors.blue;
-        else if (type == 'hotel') color = Colors.green;
-        else if (type == 'pharmacy') color = Colors.pink;
-        else if (type == 'hospital') color = Colors.red;
-        else if (type == 'tourism') color = Colors.orange;
+        } else if (type == 'bus') {
+          color = Colors.blue;
+        } else if (type == 'hotel') {
+          color = Colors.green;
+        } else if (type == 'pharmacy') {
+          color = Colors.pink;
+        } else if (type == 'hospital') {
+          color = Colors.red;
+        } else if (type == 'tourism') {
+          color = Colors.orange;
+        }
 
         _addMarker(
           loc['id'] ?? UniqueKey().toString(),

@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
-import '../../services/mobility_service.dart';
-import '../../models/mobility_models.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../screens/mobility/driver_registration_screen.dart';
 
 class TaxiQueueScreen extends StatelessWidget {
   const TaxiQueueScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final service = MobilityService();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Taxi Queue Management'),
         backgroundColor: Colors.blueGrey[800],
         foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<List<TaxiQueue>>(
-        stream: service.getTaxiQueue(),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('drivers')
+            .where('online', isEqualTo: true)
+            .where('status', isEqualTo: 'waiting')
+            .snapshots(),
         builder: (context, snapshot) {
+          if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final queue = snapshot.data!;
+          final queue = snapshot.data!.docs;
 
           return Column(
             children: [
@@ -40,11 +42,11 @@ class TaxiQueueScreen extends StatelessWidget {
                 child: ListView.builder(
                   itemCount: queue.length,
                   itemBuilder: (context, index) {
-                    final item = queue[index];
+                    final data = queue[index].data() as Map<String, dynamic>;
                     return ListTile(
                       leading: CircleAvatar(child: Text('${index + 1}')),
-                      title: Text('Taxi Number: ${item.plateNumber}'),
-                      subtitle: Text('Joined: ${item.joinedAt}'),
+                      title: Text('Taxi: ${data['plateNumber']}'),
+                      subtitle: Text('Driver: ${data['fullName']} | ${data['stationName'] ?? 'General'}'),
                       trailing: const Icon(Icons.more_vert),
                     );
                   },
@@ -71,9 +73,6 @@ class TaxiQueueScreen extends StatelessWidget {
   }
 
   void _joinQueue(BuildContext context) async {
-    // Mock join queue logic
-    await MobilityService().joinTaxiQueue('driver_123', 'HW-34567');
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Joined queue at position 12')));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const DriverRegistrationScreen()));
   }
 }

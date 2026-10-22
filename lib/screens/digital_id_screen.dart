@@ -81,7 +81,7 @@ class DigitalIDScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _idInfo('MEMBERSHIP', user?.membershipNumber ?? 'N/A'),
-                      _idInfo('STATUS', user?.isActive == true ? 'ACTIVE' : 'INACTIVE'),
+                      _idInfo('STATUS', user?.status.toUpperCase() ?? 'ACTIVE'),
                     ],
                   ),
                 ],

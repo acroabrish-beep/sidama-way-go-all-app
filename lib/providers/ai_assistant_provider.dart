@@ -4,13 +4,9 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../models/ai_message.dart';
 import '../utils/language_provider.dart';
-
-
-import '../services/firestore_service.dart';
-import '../models/city_os_models.dart';
+import '../services/ai_service.dart';
 
 class AiAssistantProvider with ChangeNotifier {
-  final FirestoreService _fs = FirestoreService();
   final List<AiMessage> _messages = [];
   bool _isTyping = false;
   final FlutterTts _tts = FlutterTts();
@@ -62,70 +58,37 @@ class AiAssistantProvider with ChangeNotifier {
     _isTyping = true;
     notifyListeners();
 
-    final input = userText.toLowerCase();
-    String response = "I'm analyzing city data for you...";
+    final aiService = NextJSAIServiceImpl();
+    final langCode = lang == AppLanguage.amharic ? 'am' : lang == AppLanguage.sidaamuAfoo ? 'sid' : 'en';
+
+    final history = _messages
+        .where((m) => m.sender == MessageSender.user || m.sender == MessageSender.ai)
+        .take(10)
+        .map((m) => {
+              'role': m.sender == MessageSender.user ? 'user' : 'assistant',
+              'content': m.text
+            })
+        .toList()
+        .reversed
+        .toList();
+
+    // Remove current user message from history as it's passed separately in chat()
+    if (history.isNotEmpty && history.last['content'] == userText) {
+      history.removeLast();
+    }
 
     try {
-      if (input.contains('taxi') && input.contains('online')) {
-        int count = await _fs.getCollectionCount(CityOSCollection.taxis);
-        response = lang == AppLanguage.amharic
-          ? "በአሁኑ ሰዓት $count ታክሲዎች በመስመር ላይ ይገኛሉ።"
-          : "There are currently $count taxis online in Hawassa.";
-      } else if (input.contains('revenue') || input.contains('income')) {
-        double rev = await _fs.getTotalRevenue();
-        response = lang == AppLanguage.amharic
-          ? "የዛሬው ጠቅላላ ገቢ ${rev.toInt()} ብር ነው።"
-          : "Today's total revenue across all sectors is ${rev.toInt()} ETB.";
-      } else if (input.contains('emergency') || input.contains('active')) {
-        int count = await _fs.getCollectionCount(CityOSCollection.emergencyRequests);
-        response = lang == AppLanguage.amharic
-          ? "በአሁኑ ጊዜ $count ንቁ የአደጋ ጊዜ ጥሪዎች አሉ።"
-          : "There are $count active emergency requests currently being handled.";
-      } else if (input.contains('hotel')) {
-        int count = await _fs.getCollectionCount(CityOSCollection.hotels);
-        response = lang == AppLanguage.amharic
-          ? "$count ሆቴሎች በስርዓቱ ውስጥ ተመዝግበዋል።"
-          : "There are $count hotels registered in the Smart City platform.";
-      }
-else {
-        response = _generateLocalResponse(userText, lang);
-      }
+      final response = await aiService.chat(userText, langCode, history: history);
+      _messages.insert(0, AiMessage(text: response, sender: MessageSender.ai, timestamp: DateTime.now()));
     } catch (e) {
-      response = "I encountered an error accessing city databases.";
+      _messages.insert(0, AiMessage(text: "I encountered an error connecting to the city AI network.", sender: MessageSender.ai, timestamp: DateTime.now()));
     }
 
-    _messages.insert(0, AiMessage(text: response, sender: MessageSender.ai, timestamp: DateTime.now()));
     _isTyping = false;
     notifyListeners();
-    _speak(response, lang);
-  }
-
-  String _generateLocalResponse(String input, AppLanguage lang) {
-    final lower = input.toLowerCase();
-
-    // Sidamu Afoo
-    if (lang == AppLanguage.sidaamuAfoo) {
-      if (lower.contains('keere') || lower.contains('hiitto')) {
-        return "Keere! Hawassa Smart City kaa'laanchote. Hiitto kaa'lotto?";
-      }
-      if (lower.contains('taxete')) {
-        return "Taxete daafira xa'mi. Hi'nne taxi no?";
-      }
-      if (lower.contains('waga')) {
-        return "Gari waga firestore giddo no.";
-      }
-      return "Maniite, di-afiommo. Busete doogo, taxete fare, woy income daafira xa'mi.";
+    if (_messages.isNotEmpty && _messages.first.sender == MessageSender.ai) {
+      _speak(_messages.first.text, lang);
     }
-
-    // Amharic
-    if (lang == AppLanguage.amharic) {
-      if (lower.contains('ሰላም')) return "ሰላም! የሀዋሳ ስማርት ሲቲ ረዳት ነኝ። እንዴት ልረዳዎት እችላለሁ?";
-      return "ይቅርታ፣ አልገባኝም። ስለ አውቶቡስ፣ ታክሲ፣ ሆቴሎች ወይም ገቢ መጠየቅ ይችላሉ።";
-    }
-
-    // English
-    if (lower.contains('hello') || lower.contains('hi')) return "Hello! I am your Hawassa Smart City Assistant. How can I help you today?";
-    return "I'm not sure about that. Try asking about 'taxis online', 'today's revenue', or 'active emergencies'.";
   }
 
   void _speak(String text, AppLanguage lang) async {

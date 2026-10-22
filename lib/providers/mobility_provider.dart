@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/mobility_models.dart';
+import '../models/taxi_models.dart';
+import '../models/city_os_models.dart';
 import '../services/mobility_service.dart';
 
 class MobilityProvider with ChangeNotifier {

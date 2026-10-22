@@ -13,7 +13,10 @@ class _CityTaxiScreenState extends State<CityTaxiScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<MobilityProvider>().fetchTaxiRoutes());
+    Future.microtask(() {
+      if (!mounted) return;
+      context.read<MobilityProvider>().fetchTaxiRoutes();
+    });
   }
 
   @override

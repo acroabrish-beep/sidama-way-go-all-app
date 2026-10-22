@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../services/firestore_service.dart';
+import '../widgets/ai_insights_card.dart';
 
 class EcoShineDashboard extends StatefulWidget {
   const EcoShineDashboard({super.key});
@@ -54,6 +55,10 @@ class _EcoShineDashboardState extends State<EcoShineDashboard> {
   Widget _buildStationsTab() {
     return Column(
       children: [
+        const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: AIInsightsCard(dashboardContext: 'eco_shine', title: '🤖 Eco-Shine AI Insights'),
+        ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _fs.getCollectionStream('eco_shine_locations'),

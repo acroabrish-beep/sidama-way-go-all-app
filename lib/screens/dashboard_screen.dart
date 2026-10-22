@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/city_os_models.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -17,9 +18,9 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                _statStream('USERS', 'users', Icons.people, Colors.green),
+                _statStream('USERS', CityOSCollection.users, Icons.people, Colors.green),
                 const SizedBox(width: 12),
-                _statStream('TAXIS', 'vehicles', Icons.local_taxi, Colors.blue, whereField: 'type', whereValue: 'City Taxi'),
+                _statStream('TAXIS', CityOSCollection.vehicles, Icons.local_taxi, Colors.blue, whereField: 'type', whereValue: 'City Taxi'),
               ],
             ),
             const SizedBox(height: 32),
@@ -49,7 +50,7 @@ class DashboardScreen extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
@@ -71,7 +72,7 @@ class DashboardScreen extends StatelessWidget {
       height: 200,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -97,7 +98,7 @@ class DashboardScreen extends StatelessWidget {
 
   Widget _buildAlertsList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('announcements').orderBy('timestamp', descending: true).limit(5).snapshots(),
+      stream: FirebaseFirestore.instance.collection(CityOSCollection.announcements).orderBy('timestamp', descending: true).limit(5).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final docs = snapshot.data!.docs;

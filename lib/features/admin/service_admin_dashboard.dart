@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../models/admin_models.dart';
+import '../../models/user_model.dart';
+import '../../widgets/role_protected_widget.dart';
 
 class ServiceAdminDashboard extends StatefulWidget {
   final UserRole role;
@@ -13,27 +14,30 @@ class ServiceAdminDashboard extends StatefulWidget {
 class _ServiceAdminDashboardState extends State<ServiceAdminDashboard> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.serviceName} Admin'),
-        backgroundColor: _getRoleColor(widget.role),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat),
-            onPressed: () => _showAIAssistant(context),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildQuickActions(context),
-            const SizedBox(height: 20),
-            _buildDataManagement(context),
-            const SizedBox(height: 20),
-            _buildAnalyticsPreview(context),
+    return RoleProtectedWidget(
+      allowedRoles: [widget.role, UserRole.superAdmin],
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('${widget.serviceName} Admin'),
+          backgroundColor: _getRoleColor(widget.role),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.chat),
+              onPressed: () => _showAIAssistant(context),
+            ),
           ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildQuickActions(context),
+              const SizedBox(height: 20),
+              _buildDataManagement(context),
+              const SizedBox(height: 20),
+              _buildAnalyticsPreview(context),
+            ],
+          ),
         ),
       ),
     );
@@ -41,10 +45,15 @@ class _ServiceAdminDashboardState extends State<ServiceAdminDashboard> {
 
   Color _getRoleColor(UserRole role) {
     switch (role) {
-      case UserRole.terminalAdmin: return Colors.teal;
-      case UserRole.healthcareAdmin: return Colors.redAccent;
+      case UserRole.oldTerminalAdmin:
+      case UserRole.newTerminalAdmin:
+        return Colors.teal;
+      case UserRole.healthAdmin: return Colors.redAccent;
       case UserRole.tourismAdmin: return Colors.green;
       case UserRole.businessAdmin: return Colors.orange;
+      case UserRole.pharmacyAdmin: return Colors.purple;
+      case UserRole.emergencyAdmin: return Colors.red;
+      case UserRole.taxiAdmin: return Colors.blue;
       default: return Colors.blueGrey;
     }
   }

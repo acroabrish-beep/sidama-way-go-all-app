@@ -18,7 +18,7 @@ class EcoShineScreen extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            color: const Color(0xFF00695C).withOpacity(0.1),
+            color: const Color(0xFF00695C).withValues(alpha: 0.1),
             child: const Row(
               children: [
                 Icon(Icons.info_outline, color: Color(0xFF00695C)),
@@ -44,8 +44,7 @@ class EcoShineScreen extends StatelessWidget {
                     final s = stations[i].data() as Map<String, dynamic>? ?? {};
                     final name = s['name'] as String? ?? 'Station';
                     final status = s['status'] as String? ?? 'Open';
-                    // We'll calculate a dummy capacity for UI based on status
-                    final capacity = status == 'Open' ? 0.3 : 1.0;
+                    final capacity = (s['currentOccupancy'] ?? 0) / (s['maxCapacity'] ?? 1);
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16),

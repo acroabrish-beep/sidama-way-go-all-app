@@ -1,13 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'ai_service.dart';
 
 class SmartAIService {
-  // Wrapper for AI logic (OpenAI integration via Cloud Functions)
+  static final AIService _realAI = NextJSAIServiceImpl();
+
   static Future<String> getRouteRecommendation(String destination) async {
-    // Simulated AI call
-    await Future.delayed(const Duration(seconds: 1));
-    return "Route optimized via Tabor Mountain to avoid traffic at Piazza.";
+    try {
+      final response = await _realAI.chat(
+        "Suggest an optimized route to $destination in Hawassa city. Mention any landmarks or potential traffic areas.",
+        "en",
+      );
+      return response;
+    } catch (e) {
+      return "Route optimized for current traffic conditions.";
+    }
   }
 
   static Future<Map<String, dynamic>> predictTraffic(String routeId) async {

@@ -63,7 +63,7 @@ class BusinessDashboard extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
         child: Column(
           children: [
             Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),

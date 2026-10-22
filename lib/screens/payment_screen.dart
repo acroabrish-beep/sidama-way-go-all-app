@@ -134,6 +134,7 @@ class PaymentScreen extends StatelessWidget {
                 await FirebaseFirestore.instance.collection('users').doc(uid).update({
                   'walletBalance': FieldValue.increment(amount),
                 });
+                if (!context.mounted) return;
                 Navigator.pop(context);
               }
             },

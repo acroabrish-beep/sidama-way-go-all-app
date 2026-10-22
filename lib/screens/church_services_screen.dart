@@ -166,7 +166,7 @@ class ChurchServicesScreen extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -199,14 +199,16 @@ class ChurchServicesScreen extends StatelessWidget {
           .limit(3)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty)
+        if (docs.isEmpty) {
           return const Text(
             'No sermons available yet.',
             style: TextStyle(color: Colors.grey),
           );
+        }
 
         return Column(
           children: docs.map((doc) {
@@ -249,14 +251,16 @@ class ChurchServicesScreen extends StatelessWidget {
           .limit(3)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty)
+        if (docs.isEmpty) {
           return const Text(
             'No upcoming events.',
             style: TextStyle(color: Colors.grey),
           );
+        }
 
         return Column(
           children: docs.map((doc) {
@@ -265,7 +269,7 @@ class ChurchServicesScreen extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFFBC02D).withOpacity(0.1),
+                  backgroundColor: const Color(0xFFFBC02D).withValues(alpha: 0.1),
                   child: const Icon(Icons.event, color: Color(0xFFFBC02D)),
                 ),
                 title: Text(

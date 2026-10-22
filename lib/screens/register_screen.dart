@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -27,11 +28,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final authService = Provider.of<AuthProvider>(context, listen: false);
-      // Note: We need to expose registerUser in AuthProvider or use AuthService directly
-      // For now, let's assume we use AuthService directly through a provider method if added
-      // Or just implement it here for simplicity of the task
-      await authService.registerUser(
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      // Check for duplicate email or phone in Firestore before registering
+      final emailCheck = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: _emailController.text.trim())
+          .get();
+      if (emailCheck.docs.isNotEmpty) {
+        setState(() => _error = 'Email already registered');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final phoneCheck = await FirebaseFirestore.instance
+          .collection('users')
+          .where('phone', isEqualTo: _phoneController.text.trim())
+          .get();
+      if (phoneCheck.docs.isNotEmpty) {
+        setState(() => _error = 'Phone number already registered');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      await authProvider.registerUser(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         fullName: _nameController.text.trim(),

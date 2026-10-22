@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/mobility_models.dart';
+import '../models/taxi_models.dart';
+import '../models/city_os_models.dart';
 
 class MobilityService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -33,21 +35,23 @@ class MobilityService {
     return snapshot.docs.map((doc) => TaxiRoute.fromFirestore(doc)).toList();
   }
 
-  Stream<List<TaxiQueue>> getTaxiQueue() {
+  Stream<List<TaxiDriver>> getTaxiQueue(String stationId) {
     return _db
-        .collection('queues')
-        .orderBy('position')
+        .collection('drivers')
+        .where('stationId', isEqualTo: stationId)
+        .where('online', isEqualTo: true)
+        .where('status', isEqualTo: 'waiting')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => TaxiQueue.fromFirestore(doc)).toList());
+        .map((snapshot) => snapshot.docs.map((doc) => TaxiDriver.fromFirestore(doc)).toList());
   }
 
-  Future<void> joinTaxiQueue(String taxiId, String plateNumber) async {
-    var snapshot = await _db.collection('queues').get();
-    int nextPosition = snapshot.docs.length + 1;
-    await _db.collection('queues').doc(taxiId).set({
-      'plateNumber': plateNumber,
-      'position': nextPosition,
-      'joinedAt': FieldValue.serverTimestamp(),
+  Future<void> joinTaxiQueue(String userId, String stationId, String stationName) async {
+    await _db.collection('drivers').doc(userId).update({
+      'stationId': stationId,
+      'stationName': stationName,
+      'online': true,
+      'status': 'waiting',
+      'lastUpdate': FieldValue.serverTimestamp(),
     });
   }
 

@@ -59,7 +59,7 @@ class MarketplaceScreen extends StatelessWidget {
       itemBuilder: (context, i) {
         final cat = categories[i];
         return Container(
-          decoration: BoxDecoration(color: Colors.deepOrange.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(color: Colors.deepOrange.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16)),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -109,7 +109,7 @@ class MarketplaceScreen extends StatelessWidget {
   Widget _buildQuotationCard(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.blue.withOpacity(0.3))),
+      decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.blue.withValues(alpha: 0.3))),
       child: Column(
         children: [
           const Text('Need a custom project estimate?', style: TextStyle(fontWeight: FontWeight.bold)),

@@ -133,7 +133,7 @@ class _ContractRideScreenState extends State<ContractRideScreen> {
           onTap: () => setState(() => _selectedVehicle = v['type']),
           child: Container(
             decoration: BoxDecoration(
-              color: isSelected ? Colors.green.withOpacity(0.1) : Colors.white,
+              color: isSelected ? Colors.green.withValues(alpha: 0.1) : Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: isSelected ? Colors.green : Colors.grey.shade300, width: 2),
             ),
@@ -158,7 +158,7 @@ class _ContractRideScreenState extends State<ContractRideScreen> {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -244,7 +244,7 @@ class _ContractRideScreenState extends State<ContractRideScreen> {
   Widget _buildAirportTransferCard() {
     return Card(
       margin: const EdgeInsets.all(16),
-      color: Colors.blue.withOpacity(0.05),
+      color: Colors.blue.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.blue)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),

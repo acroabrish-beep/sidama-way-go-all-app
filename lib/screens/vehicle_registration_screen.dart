@@ -29,6 +29,19 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // Check for duplicate plate number
+      final duplicate = await FirebaseFirestore.instance
+          .collection('vehicles')
+          .where('plateNumber', isEqualTo: _plateController.text.trim())
+          .get();
+
+      if (duplicate.docs.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vehicle with this plate number already registered')));
+        setState(() => _isLoading = false);
+        return;
+      }
+
       await FirebaseFirestore.instance.collection('vehicles').add({
         'plateNumber': _plateController.text,
         'type': _vehicleType,

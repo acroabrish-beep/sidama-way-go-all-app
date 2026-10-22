@@ -86,7 +86,7 @@ class _BusTrackScreenState extends State<BusTrackScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? Color(routeColor).withOpacity(0.1)
+                              ? Color(routeColor).withValues(alpha: 0.1)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
@@ -97,7 +97,7 @@ class _BusTrackScreenState extends State<BusTrackScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 6,
                             ),
                           ],

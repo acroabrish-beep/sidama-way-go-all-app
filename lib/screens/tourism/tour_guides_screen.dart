@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/tourism_models.dart';
+import '../../models/city_os_models.dart';
 import 'tour_guide_registration_screen.dart';
 
 class TourGuidesScreen extends StatefulWidget {
@@ -62,7 +62,7 @@ class _TourGuidesScreenState extends State<TourGuidesScreen> with SingleTickerPr
                   label: Text(lang),
                   selected: _selectedLang == lang,
                   onSelected: (s) => setState(() => _selectedLang = lang),
-                  selectedColor: Colors.teal.withOpacity(0.3),
+                  selectedColor: Colors.teal.withValues(alpha: 0.3),
                 ),
               );
             }).toList(),

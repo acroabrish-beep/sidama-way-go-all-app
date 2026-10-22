@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/dashboard_base.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/ai_insights_card.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 class AnnouncementDashboard extends StatefulWidget {
   const AnnouncementDashboard({super.key});
@@ -16,6 +18,7 @@ class _AnnouncementDashboardState extends State<AnnouncementDashboard> {
   final _titleController = TextEditingController();
   final _messageController = TextEditingController();
   String _selectedCategory = 'City Update';
+  final FlutterTts _tts = FlutterTts();
 
   final List<String> _categories = [
     'City Update',
@@ -54,6 +57,10 @@ class _AnnouncementDashboardState extends State<AnnouncementDashboard> {
     return DashboardBase(
       title: 'City Announcement Center',
       children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 16.0),
+          child: AIInsightsCard(dashboardContext: 'announcements', title: '🤖 Announcement AI Insights'),
+        ),
         const Text(
           'Publish New Announcement',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
@@ -136,6 +143,11 @@ class _AnnouncementDashboardState extends State<AnnouncementDashboard> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.volume_up, color: Colors.orangeAccent),
+                      onPressed: () => _tts.speak("${data['title']}. ${data['message']}"),
+                      tooltip: 'Speak Announcement',
+                    ),
                     IconButton(
                       icon: Icon(isActive ? Icons.visibility : Icons.visibility_off, color: isActive ? Colors.greenAccent : Colors.grey),
                       onPressed: () => doc.reference.update({'isActive': !isActive}),

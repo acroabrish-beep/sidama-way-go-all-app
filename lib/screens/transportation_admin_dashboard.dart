@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:provider/provider.dart';
+import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
 import '../services/firestore_service.dart';
 import 'terminal_qr_scanner.dart';
 
@@ -15,18 +18,18 @@ class TransportationAdminDashboard extends StatefulWidget {
 class _TransportationAdminDashboardState extends State<TransportationAdminDashboard> {
   final FirestoreService _fs = FirestoreService();
   final FlutterTts _flutterTts = FlutterTts();
-  final List<String> _admins = ["acroabrish@gmail.com"];
 
   @override
   void initState() {
     super.initState();
-    _fs.checkAndSeedTransport();
+    // Demo seeding is debug-only.
+    if (kDebugMode) _fs.checkAndSeedTransport();
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || !_admins.contains(user.email)) {
+    final role = Provider.of<AuthProvider>(context, listen: false).userModel?.role;
+    if (role != UserRole.superAdmin && role != UserRole.governmentFleetAdmin) {
       return const Scaffold(body: Center(child: Text("Access Denied")));
     }
 

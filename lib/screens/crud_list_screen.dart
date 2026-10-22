@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/paginated_list.dart';
 
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart' as custom_auth;
@@ -40,58 +41,39 @@ class _CRUDListScreenState extends State<CRUDListScreen> {
             colors: [Color(0xFF1A237E), Color(0xFF2E7D32)],
           ),
         ),
-        child: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection(widget.collection).snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
-            }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: Colors.white));
-            }
+        child: PaginatedFirestoreListView(
+          query: FirebaseFirestore.instance.collection(widget.collection).orderBy('createdAt', descending: true),
+          itemBuilder: (context, doc) {
+            final data = doc.data() as Map<String, dynamic>;
 
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) {
-              return const Center(child: Text('No entries found.', style: TextStyle(color: Colors.white70)));
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: docs.length,
-              itemBuilder: (context, index) {
-                final doc = docs[index];
-                final data = doc.data() as Map<String, dynamic>;
-
-                return GlassCard(
-                  padding: const EdgeInsets.all(8),
-                  child: ListTile(
-                    title: Text(
-                      data[widget.fields.first]?.toString() ?? 'Unnamed',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            return GlassCard(
+              padding: const EdgeInsets.all(8),
+              child: ListTile(
+                title: Text(
+                  data[widget.fields.first]?.toString() ?? 'Unnamed',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: widget.fields.skip(1).map((f) {
+                    final val = data[f]?.toString() ?? 'N/A';
+                    return Text('$f: $val', style: const TextStyle(color: Colors.white70, fontSize: 12));
+                  }).toList(),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                      onPressed: () => _showEditDialog(context, doc),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: widget.fields.skip(1).map((f) {
-                        final val = data[f]?.toString() ?? 'N/A';
-                        return Text('$f: $val', style: const TextStyle(color: Colors.white70, fontSize: 12));
-                      }).toList(),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _confirmDelete(context, doc),
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                          onPressed: () => _showEditDialog(context, doc),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.redAccent),
-                          onPressed: () => _confirmDelete(context, doc),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ),
             );
           },
         ),

@@ -149,7 +149,7 @@ class WalletScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: Colors.white),
@@ -186,7 +186,7 @@ class WalletScreen extends StatelessWidget {
   Widget _payItem(BuildContext context, String label, IconData icon, Color color) {
     return Column(
       children: [
-        CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color)),
+        CircleAvatar(backgroundColor: color.withValues(alpha: 0.1), child: Icon(icon, color: color)),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 10)),
       ],
@@ -220,7 +220,7 @@ class WalletScreen extends StatelessWidget {
       leading: Container(
         width: 40,
         height: 40,
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
         child: const Icon(Icons.account_balance_wallet, size: 20),
       ),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),

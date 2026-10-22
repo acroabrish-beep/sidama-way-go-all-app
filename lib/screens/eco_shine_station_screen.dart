@@ -125,7 +125,7 @@ class _SolarStatusCard extends StatelessWidget {
                     value: 0.85,
                     strokeWidth: 8,
                     color: Colors.amber,
-                    backgroundColor: Colors.amber.withOpacity(0.1),
+                    backgroundColor: Colors.amber.withValues(alpha: 0.1),
                   ),
                 ),
                 const Text('85%', style: TextStyle(fontWeight: FontWeight.bold)),

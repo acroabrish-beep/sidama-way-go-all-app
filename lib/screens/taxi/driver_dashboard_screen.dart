@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/taxi_models.dart';
 import '../../services/taxi_service.dart';
@@ -34,7 +33,7 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
         if (mounted) {
           setState(() {
             _driver = driver;
-            _isOnline = driver?.taxiStatus == TaxiStatus.online;
+            _isOnline = driver?.online ?? false;
           });
           if (_isOnline) {
             _startLocationTracking();
@@ -46,37 +45,44 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
     }
   }
 
-  void _toggleOnline(bool value) async {
-    if (_driver == null || _driver!.status != DriverStatus.approved) {
+  Future<void> _toggleOnline(bool value) async {
+    if (_driver == null || _driver!.approvalStatus != DriverStatus.approved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Your account must be approved to go online.'))
+        const SnackBar(
+          content: Text('Your account must be approved to go online.'),
+        ),
       );
       return;
     }
-
-    final newStatus = value ? TaxiStatus.online : TaxiStatus.offline;
+    final newStatus = value ? TaxiStatus.waiting : TaxiStatus.offline;
     await _taxiService.updateDriverStatus(_driver!.id, newStatus);
   }
 
-  void _startLocationTracking() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  Future<void> _startLocationTracking() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
 
-    LocationPermission permission = await Geolocator.checkPermission();
+    var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) return;
     }
 
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5, // Update every 5 meters
-      ),
-    ).listen((Position position) {
-      final zone = TaxiService.detectZone(position.latitude, position.longitude);
-      _taxiService.updateDriverLocation(_driver!.id, position, zone);
-    });
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((position) {
+          if (_driver != null) {
+            final zone = TaxiService.detectZone(
+              position.latitude,
+              position.longitude,
+            );
+            _taxiService.updateDriverLocation(_driver!.id, position, zone);
+          }
+        });
   }
 
   void _stopLocationTracking() {
@@ -92,7 +98,8 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_driver == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_driver == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -113,7 +120,7 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
         children: [
           _buildStatusHeader(),
           Expanded(
-            child: _isOnline ? _buildRideRequests() : _buildOfflineView(),
+            child: _isOnline ? _buildAssignedRideView() : _buildOfflineView(),
           ),
           _buildSOSButton(),
         ],
@@ -137,14 +144,37 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_driver!.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('Status: ${_driver!.status.toString().split('.').last.toUpperCase()}',
-                  style: TextStyle(color: _driver!.status == DriverStatus.approved ? Colors.green : Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-                if (_isOnline) Text('Zone: ${_driver!.currentZone ?? 'Detecting...'}', style: const TextStyle(fontSize: 12, color: Colors.blue)),
+                Text(
+                  _driver!.fullName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Status: ${_driver!.approvalStatus.toString().split('.').last.toUpperCase()}',
+                  style: TextStyle(
+                    color: _driver!.approvalStatus == DriverStatus.approved
+                        ? Colors.green
+                        : Colors.orange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                if (_isOnline)
+                  Text(
+                    'Zone: ${_driver!.currentZone ?? 'Detecting...'}',
+                    style: const TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
               ],
             ),
           ),
-          _buildStat('Rating', _driver!.rating.toString(), Icons.star, Colors.amber),
+          _buildStat(
+            'Rating',
+            _driver!.rating.toString(),
+            Icons.star,
+            Colors.amber,
+          ),
         ],
       ),
     );
@@ -167,13 +197,26 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
         children: [
           const Icon(Icons.cloud_off, size: 80, color: Colors.grey),
           const SizedBox(height: 16),
-          const Text('You are currently Offline', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+          const Text(
+            'You are currently Offline',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Go online to start receiving ride requests', style: TextStyle(color: Colors.grey)),
+          const Text(
+            'Go online to start receiving ride requests',
+            style: TextStyle(color: Colors.grey),
+          ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => _toggleOnline(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('GO ONLINE'),
           ),
         ],
@@ -181,75 +224,127 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
     );
   }
 
-  Widget _buildRideRequests() {
+  Widget _buildAssignedRideView() {
     return StreamBuilder<List<RideRequest>>(
-      stream: _taxiService.getNearbyRideRequests(_driver!.currentZone ?? 'Hawassa'),
+      stream: _taxiService.getDriverActiveRides(_driver!.id),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-        }
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final requests = snapshot.data!;
-
-        if (requests.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(strokeWidth: 2),
-                SizedBox(height: 16),
-                Text('Waiting for ride requests...', style: TextStyle(color: Colors.grey)),
-              ],
+        if (snapshot.hasError)
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
             ),
           );
-        }
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
+        final List<RideRequest> requests = snapshot.data as List<RideRequest>;
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: requests.length,
-          itemBuilder: (context, index) {
-            final req = requests[index];
-            return Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+        if (requests.isEmpty) {
+          return StreamBuilder<int>(
+            stream: _taxiService.getDriverQueuePosition(
+              _driver!.id,
+              _driver!.stationId,
+            ),
+            builder: (context, queueSnapshot) {
+              final position = queueSnapshot.data ?? 0;
+              return Center(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(req.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('${req.fare} ETB', style: const TextStyle(color: Color(0xFFE65100), fontWeight: FontWeight.bold, fontSize: 18)),
-                      ],
+                    const Icon(Icons.timer, size: 80, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(
+                      position > 0
+                          ? 'You are queued at station ${_driver!.stationName}\nPosition: $position'
+                          : 'Waiting for assignment...',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
                     ),
-                    const Divider(height: 24),
-                    _locationRow(Icons.my_location, 'Pickup', req.pickup),
                     const SizedBox(height: 8),
-                    _locationRow(Icons.location_on, 'Destination', req.destination),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {}, // Reject logic
-                            child: const Text('REJECT'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => _taxiService.acceptRide(req.id, _driver!.id, _driver!.fullName),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                            child: const Text('ACCEPT'),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'The system will automatically assign you the next booking from your station queue.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
                     ),
                   ],
                 ),
+              );
+            },
+          );
+        }
+
+        final req = requests.first;
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            req.userName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '${req.fare} ETB',
+                            style: const TextStyle(
+                              color: Color(0xFFE65100),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 24),
+                      _locationRow(Icons.my_location, 'Pickup', req.pickup),
+                      const SizedBox(height: 8),
+                      _locationRow(
+                        Icons.location_on,
+                        'Destination',
+                        req.destination,
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Status: ${req.status}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (req.status == 'Accepted')
+                        ElevatedButton(
+                          onPressed: () =>
+                              _taxiService.completeRide(req.id, _driver!.id),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                          ),
+                          child: const Text('MARK TRIP COMPLETE'),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -260,8 +355,17 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
       children: [
         Icon(icon, size: 16, color: Colors.grey),
         const SizedBox(width: 8),
-        Text('$label: ', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13), overflow: TextOverflow.ellipsis)),
+        Text(
+          '$label: ',
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -274,14 +378,32 @@ class _TaxiDriverDashboardState extends State<TaxiDriverDashboard> {
         height: 50,
         child: ElevatedButton.icon(
           onPressed: () {
-             if (_driver != null && _driver!.location != null) {
-               _taxiService.sendSOS(_driver!.id, _driver!.fullName, _driver!.location!);
-               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('SOS Alert Sent! Assistance is on the way.'), backgroundColor: Colors.red));
-             }
+            if (_driver != null && _driver!.location != null) {
+              _taxiService.sendSOS(
+                _driver!.id,
+                _driver!.fullName,
+                _driver!.location!,
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('SOS Alert Sent! Assistance is on the way.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           },
           icon: const Icon(Icons.emergency),
-          label: const Text('EMERGENCY SOS', style: TextStyle(fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          label: const Text(
+            'EMERGENCY SOS',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       ),
     );

@@ -30,18 +30,18 @@ class GlassCard extends StatelessWidget {
           child: Container(
             padding: padding ?? const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: (color ?? Colors.white).withOpacity(0.1),
+              color: (color ?? Colors.white).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: (color ?? Colors.white).withOpacity(0.2),
+                color: (color ?? Colors.white).withValues(alpha: 0.2),
                 width: 1.5,
               ),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  (color ?? Colors.white).withOpacity(0.2),
-                  (color ?? Colors.white).withOpacity(0.05),
+                  (color ?? Colors.white).withValues(alpha: 0.2),
+                  (color ?? Colors.white).withValues(alpha: 0.05),
                 ],
               ),
             ),

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
+import '../widgets/ai_insights_card.dart';
+import '../models/city_os_models.dart';
+import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
 
 class GuestHouseDashboard extends StatefulWidget {
   const GuestHouseDashboard({super.key});
@@ -14,7 +19,6 @@ class GuestHouseDashboard extends StatefulWidget {
 }
 
 class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
-  final List<String> _admins = ["acroabrish@gmail.com"];
   final FlutterTts _flutterTts = FlutterTts();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _searchQuery = "";
@@ -23,12 +27,13 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
   @override
   void initState() {
     super.initState();
-    _seedData();
+    // Demo seeding is debug-only.
+    if (kDebugMode) _seedData();
   }
 
   Future<void> _seedData() async {
     try {
-      final ghSnap = await _firestore.collection("guest_houses").limit(1).get();
+      final ghSnap = await _firestore.collection(CityOSCollection.guestHouses).limit(1).get();
       if (ghSnap.docs.isEmpty) {
         final guestHouses = [
           {
@@ -97,7 +102,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
           }
         ];
         for (var gh in guestHouses) {
-          await _firestore.collection("guest_houses").add(gh);
+          await _firestore.collection(CityOSCollection.guestHouses).add(gh);
         }
       }
 
@@ -124,8 +129,8 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final isAuthorized = user != null && _admins.contains(user.email);
+    final role = Provider.of<AuthProvider>(context, listen: false).userModel?.role;
+    final isAuthorized = role == UserRole.superAdmin || role == UserRole.hotelAdmin;
 
     if (!isAuthorized) {
       return Scaffold(
@@ -186,7 +191,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection("guest_houses").snapshots(),
+      stream: _firestore.collection(CityOSCollection.guestHouses).snapshots(),
       builder: (context, ghSnap) {
         return StreamBuilder<QuerySnapshot>(
           stream: _firestore.collection("guest_house_reservations").snapshots(),
@@ -223,6 +228,8 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const AIInsightsCard(dashboardContext: 'guest_house', title: '🤖 Guest House AI Insights'),
+                  const SizedBox(height: 16),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -303,7 +310,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
   Widget _buildGuestHousesTab() {
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore.collection("guest_houses").snapshots(),
+        stream: _firestore.collection(CityOSCollection.guestHouses).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final docs = snapshot.data!.docs;
@@ -329,7 +336,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
                           Expanded(child: Text("🏠 ${data['name'] ?? ''}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
                           Switch(
                             value: data['isActive'] ?? true,
-                            onChanged: (v) => _firestore.collection("guest_houses").doc(id).update({'isActive': v}),
+                            onChanged: (v) => _firestore.collection(CityOSCollection.guestHouses).doc(id).update({'isActive': v}),
                           ),
                         ],
                       ),
@@ -449,11 +456,11 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
                 "facilities": facC.text.split(",").map((e) => e.trim()).toList(),
               };
               if (doc == null) {
-                await _firestore.collection("guest_houses").add(payload);
+                await _firestore.collection(CityOSCollection.guestHouses).add(payload);
               } else {
-                await _firestore.collection("guest_houses").doc(doc.id).update(payload);
+                await _firestore.collection(CityOSCollection.guestHouses).doc(doc.id).update(payload);
               }
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             },
             child: const Text("SAVE"),
           ),
@@ -620,7 +627,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
             ElevatedButton(
               onPressed: () async {
                 await _firestore.collection("guest_house_reservations").doc(id).update({'status': selected.toLowerCase().replaceAll(" ", "_")});
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pop(context);
                   Navigator.pop(context);
                 }
@@ -634,7 +641,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
   }
 
   void _showAddRes() async {
-    final ghSnap = await _firestore.collection("guest_houses").get();
+    final ghSnap = await _firestore.collection(CityOSCollection.guestHouses).get();
     final houses = ghSnap.docs.map((d) => d['name'] as String).toList();
 
     final guestC = TextEditingController();
@@ -699,7 +706,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
                   "status": "confirmed",
                   "timestamp": FieldValue.serverTimestamp(),
                 });
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text("SAVE"),
             ),
@@ -753,7 +760,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
   }
 
   void _showAddRoomDialog() async {
-    final ghSnap = await _firestore.collection("guest_houses").get();
+    final ghSnap = await _firestore.collection(CityOSCollection.guestHouses).get();
     final houses = ghSnap.docs.map((d) => d['name'] as String).toList();
 
     final typeC = TextEditingController();
@@ -798,7 +805,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
                   "pricePerNight": double.tryParse(priceC.text) ?? 0.0,
                   "amenities": amenC.text.split(",").map((e) => e.trim()).toList(),
                 });
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text("SAVE"),
             ),
@@ -975,7 +982,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
                   'timestamp': FieldValue.serverTimestamp(),
                   'type': 'guest_house_alert'
                 });
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.pop(context);
                   _showSnackbar("Alert sent to all guests");
                 }
@@ -998,7 +1005,7 @@ class _GuestHouseDashboardState extends State<GuestHouseDashboard> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
           TextButton(onPressed: () async {
             await _firestore.collection(collection).doc(id).delete();
-            if (mounted) Navigator.pop(context);
+            if (context.mounted) Navigator.pop(context);
           }, child: const Text("DELETE", style: TextStyle(color: Colors.red))),
         ],
       ),

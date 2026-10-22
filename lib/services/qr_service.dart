@@ -15,7 +15,7 @@ class QRService {
         return {'success': false, 'message': 'Invalid Ticket ID'};
       }
 
-      final ticket = TicketModel.fromFirestore(doc);
+      final ticket = Ticket.fromFirestore(doc);
       if (ticket.isUsed) {
         return {'success': false, 'message': 'Ticket already used!'};
       }

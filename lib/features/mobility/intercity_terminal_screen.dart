@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/smart_city_provider.dart';
-import '../../models/smart_city_models.dart';
+
+import '../../models/city_os_models.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class IntercityTerminalScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class IntercityTerminalScreen extends StatefulWidget {
 
 class _IntercityTerminalScreenState extends State<IntercityTerminalScreen> {
   String _selectedTerminal = 'old'; // 'old' or 'new'
-  TerminalBus? _selectedBus;
+  BusVehicle? _selectedBus;
   int? _selectedSeat;
 
   @override
@@ -122,7 +123,7 @@ class _IntercityTerminalScreenState extends State<IntercityTerminalScreen> {
                   backgroundColor: const Color(0xFF2E7D32),
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('PROCEED TO PAYMENT'),
+                child: const Text('PROCEED TO BOOKING'),
               ),
             ),
         ],
@@ -131,17 +132,17 @@ class _IntercityTerminalScreenState extends State<IntercityTerminalScreen> {
   }
 
   void _confirmBooking(SmartCityProvider provider) async {
-    final ticket = BusTerminalTicket(
+    final ticket = Ticket(
       id: '',
       passengerName: provider.currentUser?.fullName ?? 'Passenger',
-      userId: provider.currentUser?.id ?? '',
+      userId: provider.currentUser?.uid ?? '',
       route: _selectedBus!.routeId,
       busId: _selectedBus!.id,
+      routeId: _selectedBus!.routeId,
       seatNumber: _selectedSeat!,
-      fare: 350.0, // Example fare
+      date: DateTime.now(),
       paymentStatus: 'paid',
-      travelDate: DateTime.now(),
-      verificationCode: 'VER-${DateTime.now().millisecondsSinceEpoch}',
+      qrData: 'VER-${DateTime.now().millisecondsSinceEpoch}',
     );
 
     await provider.bookTicket(ticket);
@@ -156,7 +157,7 @@ class _IntercityTerminalScreenState extends State<IntercityTerminalScreen> {
           children: [
             const Text('Your ticket has been generated successfully.'),
             const SizedBox(height: 20),
-            QrImageView(data: ticket.verificationCode, size: 200),
+            QrImageView(data: ticket.qrData, size: 200),
           ],
         ),
         actions: [

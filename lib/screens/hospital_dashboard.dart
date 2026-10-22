@@ -2,54 +2,63 @@ import 'package:flutter/material.dart';
 import '../widgets/dashboard_base.dart';
 import '../widgets/glass_card.dart';
 import 'crud_list_screen.dart';
+import '../widgets/ai_insights_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/city_os_models.dart';
+
+import '../widgets/role_protected_widget.dart';
+import '../models/user_model.dart';
 
 class HospitalDashboard extends StatelessWidget {
   const HospitalDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DashboardBase(
-      title: 'Healthcare Admin',
-      children: [
-        _buildStats(),
-        const SizedBox(height: 24),
-        _buildActionGrid(context),
-        const SizedBox(height: 24),
-        const Text(
-          'Ambulance Dispatch',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        const SizedBox(height: 16),
-        _buildDispatchList(),
-        const SizedBox(height: 24),
-        const Text(
-          'Registered Doctors',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        const SizedBox(height: 16),
-        _buildDoctorList(),
-      ],
+    return RoleProtectedWidget(
+      allowedRoles: const [UserRole.superAdmin, UserRole.healthAdmin],
+      child: DashboardBase(
+        title: 'Healthcare Admin',
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16.0),
+            child: AIInsightsCard(dashboardContext: 'hospital', title: '🤖 Healthcare AI Insights'),
+          ),
+          _buildStats(),
+          const SizedBox(height: 24),
+          _buildActionGrid(context),
+          const SizedBox(height: 24),
+          const Text(
+            'Ambulance Dispatch',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          _buildDispatchList(),
+          const SizedBox(height: 24),
+          const Text(
+            'Registered Doctors',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          _buildDoctorList(),
+        ],
+      ),
     );
   }
 
   Widget _buildStats() {
-    return Row(
-      children: [
-        Expanded(child: _statCardStream('Hospitals', 'hospitals', Icons.local_hospital, Colors.redAccent)),
-        const SizedBox(width: 12),
-        Expanded(child: _statCardStream('Ambulances', 'ambulances', Icons.medical_services, Colors.blueAccent)),
-      ],
-    );
-  }
-
-  Widget _statCardStream(String label, String collection, IconData icon, Color color) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(collection).snapshots(),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection(CityOSCollection.analytics).doc('healthcare').snapshots(),
       builder: (context, snapshot) {
-        String value = snapshot.hasData ? snapshot.data!.docs.length.toString() : '...';
-        return _buildStatCard(label, value, icon, color);
-      },
+        final stats = snapshot.hasData ? HealthcareSummaryStats.fromFirestore(snapshot.data!) : null;
+
+        return Row(
+          children: [
+            Expanded(child: _buildStatCard('Hospitals', stats?.totalHospitals.toString() ?? '...', Icons.local_hospital, Colors.redAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Ambulances', stats?.totalAmbulances.toString() ?? '...', Icons.medical_services, Colors.blueAccent)),
+          ],
+        );
+      }
     );
   }
 

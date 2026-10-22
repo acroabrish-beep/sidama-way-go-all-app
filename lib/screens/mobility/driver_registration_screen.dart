@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/taxi_models.dart';
+import '../../models/city_os_models.dart' as city;
 import '../../services/taxi_service.dart';
 
 class DriverRegistrationScreen extends StatefulWidget {
@@ -50,27 +51,48 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      // Check for duplicates
+      final plateCheck = await FirebaseFirestore.instance
+          .collection('drivers')
+          .where('plateNumber', isEqualTo: _plateController.text.trim())
+          .get();
+      if (plateCheck.docs.isNotEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plate number already registered')));
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      final phoneCheck = await FirebaseFirestore.instance
+          .collection('drivers')
+          .where('phone', isEqualTo: _phoneController.text.trim())
+          .get();
+      if (phoneCheck.docs.isNotEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number already registered')));
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
       final user = FirebaseAuth.instance.currentUser;
       final uid = user?.uid ?? '';
 
       final driver = TaxiDriver(
-        id: uid,
+        workerId: uid,
         fullName: _fullNameController.text,
         phone: _phoneController.text,
         email: user?.email ?? '',
-        profilePhoto: '',
-        nationalId: '',
-        drivingLicense: _licenseController.text,
-        vehiclePhoto: '',
-        plateNumber: _plateController.text,
-        vehicleModel: _vehicleModelController.text,
-        vehicleColor: _vehicleColorController.text,
-        vehicleType: _vehicleType,
-        station: _selectedStationName!,
-        stationId: _selectedStationId,
-        status: DriverStatus.approved,
-        taxiStatus: TaxiStatus.offline,
-        isOnline: false,
+        photo: '',
+        governmentId: '',
+        licenseNumber: _licenseController.text,
+        assignedVehicleId: _plateController.text,
+        assignedHubId: _selectedStationId ?? '',
+        role: _vehicleType.toLowerCase().contains('bajaj')
+            ? WorkforceRole.bajajDriver
+            : (_vehicleType.toLowerCase().contains('bus') ? WorkforceRole.busDriver : WorkforceRole.taxiDriver),
+        governmentApproval: city.ApprovalStatus.approved,
+        lifecycleStatus: WorkforceLifecycleStatus.active,
+        online: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
       await _taxiService.registerDriver(driver);

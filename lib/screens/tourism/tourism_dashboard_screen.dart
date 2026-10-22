@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/tourism_models.dart';
 import 'tourist_sites_screen.dart';
-import '../crud_list_screen.dart';
+import '../../widgets/ai_insights_card.dart';
 
 class TourismDashboardScreen extends StatefulWidget {
   const TourismDashboardScreen({super.key});
@@ -60,6 +58,8 @@ class _TourismDashboardScreenState extends State<TourismDashboardScreen> with Si
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const AIInsightsCard(dashboardContext: 'tourism', title: '🤖 Tourism AI Insights'),
+        const SizedBox(height: 16),
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -93,9 +93,9 @@ class _TourismDashboardScreenState extends State<TourismDashboardScreen> with Si
       builder: (context, snapshot) {
         int count = snapshot.data?.docs.length ?? 0;
         return Card(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: color.withOpacity(0.2))),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: color.withValues(alpha: 0.2))),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

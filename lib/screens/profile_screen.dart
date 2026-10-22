@@ -97,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: Color(item['color'] as int).withOpacity(0.1),
+                        backgroundColor: Color(item['color'] as int).withValues(alpha: 0.1),
                         child: Icon(item['icon'] as IconData, color: Color(item['color'] as int)),
                       ),
                       title: Text(item['label'] as String),
@@ -120,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       await authProvider.signOut();
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       Navigator.pushAndRemoveUntil(
                         context,
                         MaterialPageRoute(builder: (_) => const LoginScreen()),

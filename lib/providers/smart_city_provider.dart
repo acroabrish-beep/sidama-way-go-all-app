@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/smart_city_models.dart';
+import '../models/user_model.dart';
+import '../models/mobility_models.dart';
+import '../models/city_os_models.dart';
 import '../services/smart_city_service.dart';
 
 class SmartCityProvider with ChangeNotifier {
   final SmartCityService _service = SmartCityService();
 
-  CityUser? _currentUser;
-  CityUser? get currentUser => _currentUser;
+  UserModel? _currentUser;
+  UserModel? get currentUser => _currentUser;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -18,17 +20,22 @@ class SmartCityProvider with ChangeNotifier {
   }
 
   // Intercity Bus State
-  List<TerminalBus> _availableBuses = [];
-  List<TerminalBus> get availableBuses => _availableBuses;
+  List<BusVehicle> _availableBuses = [];
+  List<BusVehicle> get availableBuses => _availableBuses;
 
   void fetchBuses(String terminalId) {
-    _service.getBuses(terminalId).listen((buses) {
-      _availableBuses = buses;
-      notifyListeners();
-    });
+    // In a real app, this would be a stream listener
+    FirebaseFirestore.instance.collection('buses')
+      .where('terminalId', isEqualTo: terminalId)
+      .where('status', isEqualTo: 'ready')
+      .snapshots()
+      .listen((snap) {
+        _availableBuses = snap.docs.map((doc) => BusVehicle.fromFirestore(doc)).toList();
+        notifyListeners();
+      });
   }
 
-  Future<void> bookTicket(BusTerminalTicket ticket) async {
+  Future<void> bookTicket(Ticket ticket) async {
     _isLoading = true;
     notifyListeners();
     try {
@@ -40,12 +47,7 @@ class SmartCityProvider with ChangeNotifier {
   }
 
   // Emergency State
-  Future<void> triggerSOS(String type, GeoPoint location) async {
-    await _service.requestEmergency(type, location);
-  }
-
-  // Taxi Queue State
-  Future<void> joinQueue(String taxiId, String plateNumber) async {
-    await _service.joinTaxiQueue(taxiId, plateNumber);
+  Future<void> triggerSOS(String type, GeoPoint location, String userName) async {
+    await _service.requestEmergency(type, location, userName);
   }
 }

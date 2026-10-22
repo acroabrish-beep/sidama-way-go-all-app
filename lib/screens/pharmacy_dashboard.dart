@@ -2,50 +2,59 @@ import 'package:flutter/material.dart';
 import '../widgets/dashboard_base.dart';
 import '../widgets/glass_card.dart';
 import 'crud_list_screen.dart';
+import '../widgets/ai_insights_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/city_os_models.dart';
+
+import '../widgets/role_protected_widget.dart';
+import '../models/user_model.dart';
 
 class PharmacyDashboard extends StatelessWidget {
   const PharmacyDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DashboardBase(
-      title: 'Pharmacy Admin',
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CRUDListScreen(collection: 'medicines', title: 'Medicines', fields: ['name', 'quantity', 'price', 'pharmacy']))),
-        backgroundColor: Colors.tealAccent,
-        child: const Icon(Icons.add_shopping_cart, color: Colors.teal),
-      ),
-      children: [
-        _buildStats(),
-        const SizedBox(height: 24),
-        const Text(
-          'Inventory Status',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+    return RoleProtectedWidget(
+      allowedRoles: const [UserRole.superAdmin, UserRole.pharmacyAdmin],
+      child: DashboardBase(
+        title: 'Pharmacy Admin',
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CRUDListScreen(collection: 'medicines', title: 'Medicines', fields: ['name', 'quantity', 'price', 'pharmacy']))),
+          backgroundColor: Colors.tealAccent,
+          child: const Icon(Icons.add_shopping_cart, color: Colors.teal),
         ),
-        const SizedBox(height: 16),
-        _buildInventoryList(),
-      ],
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16.0),
+            child: AIInsightsCard(dashboardContext: 'pharmacy', title: '🤖 Pharmacy AI Insights'),
+          ),
+          _buildStats(),
+          const SizedBox(height: 24),
+          const Text(
+            'Inventory Status',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          _buildInventoryList(),
+        ],
+      ),
     );
   }
 
   Widget _buildStats() {
-    return Row(
-      children: [
-        Expanded(child: _statCardStream('Pharmacies', 'pharmacies', Icons.local_pharmacy, Colors.greenAccent)),
-        const SizedBox(width: 12),
-        Expanded(child: _statCardStream('Total Meds', 'medicines', Icons.medication, Colors.orangeAccent)),
-      ],
-    );
-  }
-
-  Widget _statCardStream(String label, String collection, IconData icon, Color color) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(collection).snapshots(),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection(CityOSCollection.analytics).doc('pharmacy').snapshots(),
       builder: (context, snapshot) {
-        String value = snapshot.hasData ? snapshot.data!.docs.length.toString() : '...';
-        return _buildStatCard(label, value, icon, color);
-      },
+        final stats = snapshot.hasData ? PharmacySummaryStats.fromFirestore(snapshot.data!) : null;
+
+        return Row(
+          children: [
+            Expanded(child: _buildStatCard('Pharmacies', stats?.totalPharmacies.toString() ?? '...', Icons.local_pharmacy, Colors.greenAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Total Meds', stats?.totalMedicines.toString() ?? '...', Icons.medication, Colors.orangeAccent)),
+          ],
+        );
+      }
     );
   }
 

@@ -125,7 +125,7 @@ class MapPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.4)
+      ..color = Colors.white.withValues(alpha: 0.4)
       ..strokeWidth = 1.0;
 
     for (double i = 0; i < size.width; i += 50) {
@@ -154,7 +154,7 @@ class RoutePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.blue.withOpacity(0.8)
+      ..color = Colors.blue.withValues(alpha: 0.8)
       ..strokeWidth = 4.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;

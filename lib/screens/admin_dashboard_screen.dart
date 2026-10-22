@@ -66,11 +66,13 @@ class _TaxiStationsTabState extends State<_TaxiStationsTab> {
   void _addStation() async {
     if (_formKey.currentState!.validate()) {
       await _taxiService.saveStation(TaxiStation(
-        id: '',
-        name: _nameController.text,
+        stationId: '',
+        stationName: _nameController.text,
+        stationCode: 'HUB',
         location: const GeoPoint(7.0504, 38.4955),
-        capacity: int.tryParse(_capacityController.text) ?? 10,
-        status: 'Active',
+        maximumVehicleCapacity: int.tryParse(_capacityController.text) ?? 10,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ));
       _nameController.clear();
       _capacityController.clear();
@@ -151,7 +153,7 @@ class _TaxiStationsTabState extends State<_TaxiStationsTab> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: (s.status == 'Active' ? Colors.green : Colors.grey).withOpacity(0.1),
+                              color: (s.status == 'Active' ? Colors.green : Colors.grey).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(s.status, style: TextStyle(color: s.status == 'Active' ? Colors.green : Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -190,13 +192,15 @@ class _TaxiStationsTabState extends State<_TaxiStationsTab> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(onPressed: () async {
             await _taxiService.saveStation(TaxiStation(
-              id: station.id,
-              name: nameC.text,
+              stationId: station.id,
+              stationName: nameC.text,
+              stationCode: station.code,
               location: station.location,
-              capacity: int.tryParse(capC.text) ?? 10,
-              status: station.status,
+              maximumVehicleCapacity: int.tryParse(capC.text) ?? 10,
+              createdAt: station.createdAt,
+              updatedAt: DateTime.now(),
             ));
-            if (mounted) Navigator.pop(context);
+            if (context.mounted) Navigator.pop(context);
           }, child: const Text('Save')),
         ],
       ),
@@ -213,7 +217,7 @@ class _TaxiStationsTabState extends State<_TaxiStationsTab> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(onPressed: () async {
             await _taxiService.deleteStation(id);
-            if (mounted) Navigator.pop(context);
+            if (context.mounted) Navigator.pop(context);
           }, child: const Text('Delete', style: TextStyle(color: Colors.red))),
         ],
       ),

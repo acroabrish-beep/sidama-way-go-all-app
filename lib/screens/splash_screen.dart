@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_model.dart';
-import 'home_screen.dart';
 import 'login_screen.dart';
+import 'home_screen.dart';
 import 'super_admin_dashboard.dart';
+import 'taxi_admin_dashboard.dart';
 import 'old_terminal_dashboard.dart';
 import 'new_terminal_dashboard.dart';
-import 'taxi_services_dashboard.dart';
 import 'tourism_dashboard.dart';
 import 'hotel_dashboard.dart';
 import 'hospital_dashboard.dart';
 import 'pharmacy_dashboard.dart';
 import 'emergency_dashboard.dart';
-import '../utils/language_provider.dart';
+import 'government_fleet_screen.dart';
+import 'church_services_screen.dart';
+import '../core/utils/logger.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,151 +31,115 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkAuth();
   }
 
-  void _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 3));
+  Future<void> _checkAuth() async {
+    await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    if (authProvider.userModel == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (authProvider.isAuthenticated) {
+      final user = authProvider.userModel;
+      if (user != null) {
+        _navigateByRole(user.role);
+      } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
-      });
+      }
     } else {
-      _navigateToRoleDashboard(authProvider.userModel!);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     }
   }
 
-  void _navigateToRoleDashboard(UserModel user) {
+  void _navigateByRole(UserRole role) {
     Widget nextScreen;
-    switch (user.role) {
-      case UserRole.super_admin:
+    AppLogger.info('Splash: Navigating by role: ${role.name}');
+
+    switch (role) {
+      case UserRole.superAdmin:
         nextScreen = const SuperAdminDashboard();
         break;
-      case UserRole.old_terminal_admin:
+      case UserRole.oldTerminalAdmin:
         nextScreen = const OldTerminalDashboard();
         break;
-      case UserRole.new_terminal_admin:
+      case UserRole.newTerminalAdmin:
         nextScreen = const NewTerminalDashboard();
         break;
-      case UserRole.taxi_admin:
-        nextScreen = const TaxiServicesDashboard();
+      case UserRole.taxiAdmin:
+        nextScreen = const TaxiAdminDashboard();
         break;
-      case UserRole.tourism_admin:
+      case UserRole.tourismAdmin:
         nextScreen = const TourismDashboard();
         break;
-      case UserRole.hotel_admin:
+      case UserRole.hotelAdmin:
         nextScreen = const HotelDashboard();
         break;
-      case UserRole.health_admin:
+      case UserRole.healthAdmin:
         nextScreen = const HospitalDashboard();
         break;
-      case UserRole.pharmacy_admin:
+      case UserRole.pharmacyAdmin:
         nextScreen = const PharmacyDashboard();
         break;
-      case UserRole.emergency_admin:
+      case UserRole.emergencyAdmin:
         nextScreen = const EmergencyDashboard();
         break;
+      case UserRole.governmentFleetAdmin:
+        nextScreen = const GovernmentFleetScreen();
+        break;
+      case UserRole.churchAdmin:
+        nextScreen = const ChurchServicesScreen();
+        break;
+      case UserRole.businessAdmin:
       case UserRole.citizen:
-      default:
+      case UserRole.taxiDriver:
         nextScreen = const HomeScreen();
         break;
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => nextScreen),
-      );
-    });
+    AppLogger.info('Splash: Routing to: ${nextScreen.runtimeType}');
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => nextScreen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final lang = Provider.of<LanguageProvider>(context);
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF1B5E20), Color(0xFF4CAF50)],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      offset: Offset(0, 8),
-                    )
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/app_logo.png',
-                  height: 140,
-                  width: 140,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.location_city, size: 80, color: Color(0xFF2E7D32));
-                  },
-                ),
+      backgroundColor: const Color(0xFF2E7D32),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/app_logo.png',
+              height: 120,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.location_city,
+                size: 100,
+                color: Colors.white,
               ),
-              const SizedBox(height: 40),
-              Text(
-                lang.t('app_title'),
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: Colors.white,
-                ),
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'Sidama Way Go',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 12),
-              Text(
-                lang.t('platform_name'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  lang.t('tagline'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 60),
-              const SizedBox(
-                width: 200,
-                child: LinearProgressIndicator(
-                  color: Colors.white,
-                  backgroundColor: Colors.white24,
-                  minHeight: 2,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const Text(
+              'Smart City Platform',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+          ],
         ),
       ),
     );

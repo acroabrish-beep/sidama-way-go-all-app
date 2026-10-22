@@ -2,27 +2,38 @@ import 'package:flutter/material.dart';
 import '../widgets/dashboard_base.dart';
 import '../widgets/glass_card.dart';
 import 'crud_list_screen.dart';
+import '../widgets/ai_insights_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../widgets/role_protected_widget.dart';
+import '../models/user_model.dart';
 
 class EmergencyDashboard extends StatelessWidget {
   const EmergencyDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DashboardBase(
-      title: 'Emergency Response',
-      children: [
-        _buildLiveAlerts(),
-        const SizedBox(height: 24),
-        _buildActionGrid(context),
-        const SizedBox(height: 24),
-        const Text(
-          'Incident Reports',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        const SizedBox(height: 16),
-        _buildIncidentList(),
-      ],
+    return RoleProtectedWidget(
+      allowedRoles: const [UserRole.superAdmin, UserRole.emergencyAdmin],
+      child: DashboardBase(
+        title: 'Emergency Response',
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16.0),
+            child: AIInsightsCard(dashboardContext: 'emergency', title: '🤖 Emergency AI Insights'),
+          ),
+          _buildLiveAlerts(),
+          const SizedBox(height: 24),
+          _buildActionGrid(context),
+          const SizedBox(height: 24),
+          const Text(
+            'Incident Reports',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          _buildIncidentList(),
+        ],
+      ),
     );
   }
 

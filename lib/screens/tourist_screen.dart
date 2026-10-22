@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../utils/language_provider.dart';
 import 'tourism/tourism_home_screen.dart';
 
 class TouristScreen extends StatelessWidget {

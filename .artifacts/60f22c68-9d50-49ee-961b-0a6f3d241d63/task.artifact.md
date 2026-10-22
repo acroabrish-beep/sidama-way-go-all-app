@@ -1,0 +1,9 @@
+- `[x]` Fix 1: Correct JSON Encoding and Error Handling in Flutter `BaseApiService`
+- `[x]` Fix 2: Implement CORS Middleware in Next.js Backend
+- `[x]` Fix 3: Centralize API Configuration in `AppConfig`
+- `[x]` Fix 4: Verify `/api/auth/sync` Endpoint Implementation
+- `[x]` Phase 1: Inspect and confirm field name mismatches
+- `[x]` Phase 2: Harden `UserModel` to support both camelCase and snake_case
+- `[x]` Phase 5: Add unit tests for `UserModel.fromMap`
+- `[/]` Phase 4: Real API Verification (POST Sync and GET Profile)
+- `[ ]` Final end-to-end verification and report

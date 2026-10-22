@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../core/utils/logger.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -20,11 +21,23 @@ class AuthProvider with ChangeNotifier {
     _authService.authStateChanges.listen((User? user) async {
       if (user == null) {
         _userModel = null;
+        _isLoading = false;
+        notifyListeners();
       } else {
-        _userModel = await _authService.getUserData(user.uid);
+        // Initial state restoration: Check if we have a valid profile.
+        // We only call GET here for session persistence.
+        // During explicit Login/Register, the AuthService returns the model directly from POST.
+        try {
+          final profile = await _authService.getUserData(user.uid);
+          _userModel = profile;
+        } catch (e) {
+          AppLogger.warning('Failed to restore session profile: $e');
+          _userModel = null;
+        } finally {
+          _isLoading = false;
+          notifyListeners();
+        }
       }
-      _isLoading = false;
-      notifyListeners();
     });
   }
 
@@ -32,85 +45,21 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      // MOCK TEST BYPASS LOGIC
-      final mockUser = _getMockUser(email, password);
-      if (mockUser != null) {
-        _userModel = mockUser;
-        print('--- MOCK LOGIN SUCCESS ---');
-        print('Mock User: ${mockUser.fullName} (${mockUser.role.name})');
-        return;
+      // signIn now returns UserModel directly from POST sync (upsert)
+      final profile = await _authService.signIn(email, password);
+      _userModel = profile;
+      
+      if (_userModel == null) {
+        AppLogger.warning('Backend sync failed or returned empty profile');
+        throw Exception('Authentication synchronization failed.');
       }
-
-      final result = await _authService.signIn(email, password);
-      if (result?.user != null) {
-        // Manually fetch and set user model immediately to avoid race conditions
-        _userModel = await _authService.getUserData(result!.user!.uid);
-      }
+    } catch (e) {
+      _userModel = null;
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  UserModel? _getMockUser(String email, String password) {
-    if (password != 'password123') return null;
-
-    UserRole? role;
-    String name = "";
-
-    switch (email.toLowerCase()) {
-      case 'admin@sidamawaygo.com':
-        role = UserRole.super_admin;
-        name = "Super Admin (Mock)";
-        break;
-      case 'newterminal@sidamawaygo.com':
-        role = UserRole.new_terminal_admin;
-        name = "New Terminal Admin (Mock)";
-        break;
-      case 'oldterminal@sidamawaygo.com':
-        role = UserRole.old_terminal_admin;
-        name = "Old Terminal Admin (Mock)";
-        break;
-      case 'taxi@sidamawaygo.com':
-        role = UserRole.taxi_admin;
-        name = "Taxi Admin (Mock)";
-        break;
-      case 'tourism@sidamawaygo.com':
-        role = UserRole.tourism_admin;
-        name = "Tourism Admin (Mock)";
-        break;
-      case 'hotel@sidamawaygo.com':
-        role = UserRole.hotel_admin;
-        name = "Hotel Admin (Mock)";
-        break;
-      case 'health@sidamawaygo.com':
-        role = UserRole.health_admin;
-        name = "Healthcare Admin (Mock)";
-        break;
-      case 'pharmacy@sidamawaygo.com':
-        role = UserRole.pharmacy_admin;
-        name = "Pharmacy Admin (Mock)";
-        break;
-      case 'emergency@sidamawaygo.com':
-        role = UserRole.emergency_admin;
-        name = "Emergency Admin (Mock)";
-        break;
-    }
-
-    if (role != null) {
-      return UserModel(
-        uid: 'mock-uid-${role.name}',
-        fullName: name,
-        email: email,
-        phone: '000-000-0000',
-        role: role,
-        department: role.name,
-        createdAt: DateTime.now(),
-        lastLogin: DateTime.now(),
-        isActive: true,
-      );
-    }
-    return null;
   }
 
   Future<void> signOut() async {
@@ -121,7 +70,14 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> refreshUser() async {
     if (_userModel != null) {
-      _userModel = await _authService.getUserData(_userModel!.uid);
+      try {
+        final refreshedProfile = await _authService.getUserData(_userModel!.uid);
+        if (refreshedProfile != null) {
+          _userModel = refreshedProfile;
+        }
+      } catch (e) {
+        AppLogger.warning('Failed to refresh user profile: $e');
+      }
       notifyListeners();
     }
   }
@@ -137,7 +93,7 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      await _authService.registerUser(
+      final profile = await _authService.registerUser(
         email: email,
         password: password,
         fullName: fullName,
@@ -145,6 +101,51 @@ class AuthProvider with ChangeNotifier {
         role: role,
         department: department,
       );
+      _userModel = profile;
+      
+      if (_userModel == null) {
+        AppLogger.warning('Backend sync failed during registration');
+        throw Exception('Registration synchronization failed.');
+      }
+    } catch (e) {
+      _userModel = null;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final profile = await _authService.signInWithGoogle();
+      _userModel = profile;
+    } catch (e) {
+      _userModel = null;
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> signInWithOTP({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final profile = await _authService.signInWithOTP(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+      _userModel = profile;
+    } catch (e) {
+      _userModel = null;
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

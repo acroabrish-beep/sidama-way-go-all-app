@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/tourism_models.dart';
+import '../../models/city_os_models.dart';
 import 'tour_operator_registration_screen.dart';
 
 class TourPackagesScreen extends StatefulWidget {
@@ -125,7 +125,7 @@ class _TourPackagesScreenState extends State<TourPackagesScreen> with SingleTick
   Widget _badge(IconData icon, String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
           Icon(icon, size: 14, color: color),

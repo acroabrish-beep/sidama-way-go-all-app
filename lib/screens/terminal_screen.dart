@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -16,7 +17,7 @@ enum TerminalStep {
   selectSeat,
   passengerInfo,
   payment,
-  ticket
+  ticket,
 }
 
 class TerminalScreen extends StatefulWidget {
@@ -53,13 +54,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
     {'route': 'Hawassa → Bahir Dar', 'fare': 450, 'duration': '12 hrs'},
   ];
 
-  final List<Map<String, dynamic>> _buses = [
-    {'id': 'BUS-001', 'departure': '6:00 AM', 'seats': 40, 'available': 28, 'company': 'Selam Bus'},
-    {'id': 'BUS-002', 'departure': '8:30 AM', 'seats': 45, 'available': 15, 'company': 'Sky Bus'},
-    {'id': 'BUS-003', 'departure': '2:00 PM', 'seats': 35, 'available': 35, 'company': 'Limalimo'},
-  ];
-
-  final List<int> _occupiedSeats = List.generate(10, (index) => Random().nextInt(40) + 1);
+  final List<int> _occupiedSeats = List.generate(
+    10,
+    (index) => Random().nextInt(40) + 1,
+  );
 
   String _ticketId = '';
 
@@ -72,7 +70,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
   }
 
   Future<void> _seedRoutes() async {
-    final snapshot = await FirebaseFirestore.instance.collection('routes').limit(1).get();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('routes')
+        .limit(1)
+        .get();
     if (snapshot.docs.isEmpty) {
       final batch = FirebaseFirestore.instance.batch();
       for (var r in _oldTerminalRoutes) {
@@ -90,7 +91,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
   @override
   void initState() {
     super.initState();
-    _seedRoutes();
+    // Demo seeding is debug-only.
+    if (kDebugMode) _seedRoutes();
   }
 
   void _nextStep(TerminalStep step) {
@@ -131,9 +133,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving booking: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving booking: $e')));
     }
   }
 
@@ -148,7 +150,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
       ),
       body: _buildStepContent(),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AiAssistantScreen()),
+        ),
         backgroundColor: const Color(0xFF1B5E20),
         icon: const Icon(Icons.smart_toy, color: Colors.white),
         label: const Text('Ask AI', style: TextStyle(color: Colors.white)),
@@ -182,7 +187,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
         _buildSelectionCard(
           icon: Icons.history,
           title: 'Hawassa Old Terminal',
-          desc: 'Serving regional routes like Shashamane, Dilla, and Arba Minch.',
+          desc:
+              'Serving regional routes like Shashamane, Dilla, and Arba Minch.',
           onTap: () {
             setState(() {
               _selectedTerminal = 'Hawassa Old Terminal';
@@ -224,9 +230,19 @@ class _TerminalScreenState extends State<TerminalScreen> {
             children: [
               Icon(icon, size: 48, color: const Color(0xFF2E7D32)),
               const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text(desc, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+              Text(
+                desc,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
             ],
           ),
         ),
@@ -241,11 +257,16 @@ class _TerminalScreenState extends State<TerminalScreen> {
           .where('terminal', isEqualTo: _selectedTerminal)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError)
+          return Center(child: Text('Error: ${snapshot.error}'));
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return const Center(child: CircularProgressIndicator());
 
         final routes = snapshot.data?.docs ?? [];
-        if (routes.isEmpty) return const Center(child: Text('No routes available for this terminal.'));
+        if (routes.isEmpty)
+          return const Center(
+            child: Text('No routes available for this terminal.'),
+          );
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -258,15 +279,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
-                title: Text(routeName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text(
+                  routeName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: Text('Duration: $duration'),
-                trailing: Text('$fare ETB', style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+                trailing: Text(
+                  '$fare ETB',
+                  style: const TextStyle(
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 onTap: () {
                   setState(() {
-                    _selectedRoute = {
-                      'route': routeName,
-                      'fare': fare,
-                    };
+                    _selectedRoute = {'route': routeName, 'fare': fare};
                   });
                   _nextStep(TerminalStep.selectBus);
                 },
@@ -280,27 +307,45 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   Widget _buildBusSelection() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('vehicles').where('terminal', isEqualTo: _selectedTerminal).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('vehicles')
+          .where('terminal', isEqualTo: _selectedTerminal)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError)
+          return Center(child: Text('Error: ${snapshot.error}'));
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return const Center(child: CircularProgressIndicator());
 
         final vehicles = snapshot.data?.docs ?? [];
-        if (vehicles.isEmpty) return const Center(child: Text('No buses available right now.'));
+        if (vehicles.isEmpty)
+          return const Center(child: Text('No buses available right now.'));
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: vehicles.length,
           itemBuilder: (context, index) {
             final b = vehicles[index].data() as Map<String, dynamic>? ?? {};
-            final busId = b['plateNumber'] as String? ?? b['id'] as String? ?? 'BUS-${index + 1}';
-            final company = b['type'] as String? ?? b['company'] as String? ?? 'Transport Co.';
+            final busId =
+                b['plateNumber'] as String? ??
+                b['id'] as String? ??
+                'BUS-${index + 1}';
+            final company =
+                b['type'] as String? ??
+                b['company'] as String? ??
+                'Transport Co.';
             final capacity = b['capacity'] as num? ?? 40;
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
-                leading: const Icon(Icons.directions_bus, color: Color(0xFF1565C0)),
-                title: Text(company, style: const TextStyle(fontWeight: FontWeight.bold)),
+                leading: const Icon(
+                  Icons.directions_bus,
+                  color: Color(0xFF1565C0),
+                ),
+                title: Text(
+                  company,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: Text('ID: $busId | Capacity: $capacity'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -326,7 +371,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
       children: [
         const Padding(
           padding: EdgeInsets.all(16.0),
-          child: Text('Select Your Seat', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          child: Text(
+            'Select Your Seat',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
         Expanded(
           child: GridView.builder(
@@ -352,15 +400,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isOccupied ? Colors.grey[300] : (isSelected ? Colors.green : Colors.white),
-                    border: Border.all(color: isOccupied ? Colors.grey : Colors.green),
+                    color: isOccupied
+                        ? Colors.grey[300]
+                        : (isSelected ? Colors.green : Colors.white),
+                    border: Border.all(
+                      color: isOccupied ? Colors.grey : Colors.green,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
                     child: Text(
                       '$seatNum',
                       style: TextStyle(
-                        color: isSelected ? Colors.white : (isOccupied ? Colors.grey : Colors.black),
+                        color: isSelected
+                            ? Colors.white
+                            : (isOccupied ? Colors.grey : Colors.black),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -398,24 +452,38 @@ class _TerminalScreenState extends State<TerminalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Passenger Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text(
+              'Passenger Details',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 24),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
-              validator: (v) => v == null || v.isEmpty ? 'Please enter full name' : null,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Please enter full name' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _phoneController,
-              decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Phone Number',
+                border: OutlineInputBorder(),
+              ),
               keyboardType: TextInputType.phone,
-              validator: (v) => v == null || v.isEmpty ? 'Please enter phone number' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Please enter phone number' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email (Optional)', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Email (Optional)',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -446,15 +514,24 @@ class _TerminalScreenState extends State<TerminalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Trip Summary', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text(
+            'Trip Summary',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           _summaryRow('Route', _selectedRoute!['route']),
           _summaryRow('Terminal', _selectedTerminal),
-          _summaryRow('Bus', '${_selectedBus!['company']} (${_selectedBus!['id']})'),
+          _summaryRow(
+            'Bus',
+            '${_selectedBus!['company']} (${_selectedBus!['id']})',
+          ),
           _summaryRow('Seat Number', '$_selectedSeat'),
           _summaryRow('Fare', '${_selectedRoute!['fare']} ETB'),
           const Divider(height: 40),
-          const Text('Select Payment Method', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            'Select Payment Method',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           _buildPaymentOption(
             title: 'Telebirr',
@@ -514,15 +591,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.grey[50],
-          border: Border.all(color: isSelected ? color : Colors.grey[300]!, width: 2),
+          color: isSelected ? color.withValues(alpha: 0.1) : Colors.grey[50],
+          border: Border.all(
+            color: isSelected ? color : Colors.grey[300]!,
+            width: 2,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
             Icon(icon, color: color),
             const SizedBox(width: 16),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
             const Spacer(),
             if (isSelected) Icon(Icons.check_circle, color: color),
           ],
@@ -543,7 +626,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       "fare": _selectedRoute!['fare'],
       "payment": _paymentMethod,
       "date": DateFormat('yyyy-MM-dd').format(DateTime.now()),
-      "status": "confirmed"
+      "status": "confirmed",
     };
 
     return SingleChildScrollView(
@@ -552,15 +635,23 @@ class _TerminalScreenState extends State<TerminalScreen> {
         children: [
           const Icon(Icons.check_circle, color: Colors.green, size: 64),
           const SizedBox(height: 16),
-          const Text('Payment Successful!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const Text('Your ticket has been booked.', style: TextStyle(color: Colors.grey)),
+          const Text(
+            'Payment Successful!',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const Text(
+            'Your ticket has been booked.',
+            style: TextStyle(color: Colors.grey),
+          ),
           const SizedBox(height: 32),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 10),
+              ],
             ),
             child: Column(
               children: [
@@ -607,7 +698,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ],
       ),
     );

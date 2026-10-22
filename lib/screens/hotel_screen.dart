@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -15,7 +16,10 @@ class _HotelScreenState extends State<HotelScreen> {
   @override
   void initState() {
     super.initState();
-    _seedHotels();
+    // Only seed hotels in debug mode for development/testing
+    if (kDebugMode) {
+      _seedHotels();
+    }
   }
 
   Future<void> _seedHotels() async {
@@ -55,7 +59,7 @@ class _HotelScreenState extends State<HotelScreen> {
                 'status': 'pending',
                 'createdAt': FieldValue.serverTimestamp(),
               });
-              if (!mounted) return;
+              if (!context.mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Reservation request sent!'), backgroundColor: Colors.green),

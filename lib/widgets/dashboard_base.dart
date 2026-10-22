@@ -98,7 +98,7 @@ class DashboardBase extends StatelessWidget {
               ),
             ),
             _drawerItem(context, 'Dashboard', Icons.dashboard, () => Navigator.pop(context)),
-            if (user?.role == UserRole.super_admin) ...[
+            if (user?.role == UserRole.superAdmin) ...[
               const Divider(color: Colors.white24),
               _drawerItem(context, 'User Management', Icons.people, () {
                 Navigator.pop(context);

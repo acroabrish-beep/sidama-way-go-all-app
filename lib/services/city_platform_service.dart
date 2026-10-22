@@ -1,17 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/city_platform_models.dart';
+import '../models/city_os_models.dart';
 
 class CityPlatformService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Intercity Bus
-  Stream<List<IntercityRoute>> getIntercityRoutes(String terminalId) {
+  Stream<List<BusRoute>> getIntercityRoutes(String terminalId) {
     return _db.collection('routes')
       .where('terminalId', isEqualTo: terminalId)
       .snapshots()
-      .map((snap) => snap.docs.map((doc) => IntercityRoute.fromFirestore(doc)).toList());
+      .map((snap) => snap.docs.map((doc) => BusRoute.fromFirestore(doc)).toList());
   }
 
   Future<void> bookIntercityTicket(Ticket ticket) async {
@@ -24,7 +24,7 @@ class CityPlatformService {
       'fare': ticket.fare,
       'paymentStatus': 'paid',
       'date': FieldValue.serverTimestamp(),
-      'verificationCode': ticket.verificationCode,
+      'verificationCode': ticket.qrData,
     });
   }
 

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/tourism_models.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:provider/provider.dart';
+import '../../models/city_os_models.dart';
+import '../../models/user_model.dart';
+import '../../providers/auth_provider.dart';
 import '../book_ride_screen.dart';
 
 class TouristSitesScreen extends StatefulWidget {
@@ -16,7 +19,6 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> with SingleTick
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'All';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String? _userEmail = FirebaseAuth.instance.currentUser?.email;
 
   @override
   void initState() {
@@ -26,7 +28,8 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    bool isAdmin = _userEmail == "acroabrish@gmail.com";
+    final role = Provider.of<AuthProvider>(context, listen: false).userModel?.role;
+    final bool isAdmin = role == UserRole.superAdmin || role == UserRole.tourismAdmin;
 
     return Scaffold(
       appBar: AppBar(
@@ -78,7 +81,7 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> with SingleTick
                   label: Text(cat),
                   selected: _selectedCategory == cat,
                   onSelected: (s) => setState(() => _selectedCategory = cat),
-                  selectedColor: Colors.green.withOpacity(0.3),
+                  selectedColor: Colors.green.withValues(alpha: 0.3),
                 ),
               );
             }).toList(),
@@ -133,7 +136,7 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> with SingleTick
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ListTile(
-            leading: CircleAvatar(backgroundColor: Colors.green.withOpacity(0.1), child: Text(emoji)),
+            leading: CircleAvatar(backgroundColor: Colors.green.withValues(alpha: 0.1), child: Text(emoji)),
             title: Text(site.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             subtitle: Text(site.description, maxLines: 2, overflow: TextOverflow.ellipsis),
           ),

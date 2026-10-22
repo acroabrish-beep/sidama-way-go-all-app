@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -19,39 +20,63 @@ class _MapScreenState extends State<MapScreen> {
 
   final Set<String> _selectedFilters = {"Me", "Taxi", "Bus", "Hotel", "Pharmacy", "Hospital", "Eco-Shine"};
 
-  // Mock Data
-  final Map<String, List<Map<String, dynamic>>> _categoryMarkers = {
-    "Taxi": [
-      {"name": "Taxi 01", "point": LatLng(7.060, 38.505), "icon": Icons.local_taxi, "color": Colors.orange},
-      {"name": "Taxi 02", "point": LatLng(7.040, 38.515), "icon": Icons.local_taxi, "color": Colors.orange},
-      {"name": "Taxi 03", "point": LatLng(7.070, 38.485), "icon": Icons.local_taxi, "color": Colors.orange},
-    ],
-    "Bus": [
-      {"name": "Blue Bus A", "point": LatLng(7.055, 38.500), "icon": Icons.directions_bus, "color": Colors.blue},
-      {"name": "Blue Bus B", "point": LatLng(7.045, 38.490), "icon": Icons.directions_bus, "color": Colors.blue},
-    ],
-    "Hotel": [
-      {"name": "Haile Resort", "point": LatLng(7.065, 38.510), "icon": Icons.hotel, "color": Colors.purple},
-      {"name": "Lewi Hotel", "point": LatLng(7.035, 38.480), "icon": Icons.hotel, "color": Colors.purple},
-    ],
-    "Pharmacy": [
-      {"name": "City Pharmacy", "point": LatLng(7.058, 38.487), "icon": Icons.local_pharmacy, "color": Colors.red},
-      {"name": "Lake Pharmacy", "point": LatLng(7.042, 38.503), "icon": Icons.local_pharmacy, "color": Colors.red},
-    ],
-    "Hospital": [
-      {"name": "Hawassa Referral", "point": LatLng(7.062, 38.483), "icon": Icons.local_hospital, "color": Colors.red},
-    ],
-    "Eco-Shine": [
-      {"name": "Eco-Shine Piazza", "point": LatLng(7.052, 38.497), "icon": Icons.wb_sunny, "color": Colors.green},
-      {"name": "Eco-Shine University", "point": LatLng(7.070, 38.490), "icon": Icons.eco, "color": Colors.green},
-    ],
+  final Map<String, List<Marker>> _markers = {
+    "Taxi": [],
+    "Bus": [],
+    "Hotel": [],
+    "Pharmacy": [],
+    "Hospital": [],
+    "Eco-Shine": [],
   };
+
+  final List<StreamSubscription> _subs = [];
 
   @override
   void initState() {
     super.initState();
     _determinePosition();
+    _listenToMarkers();
   }
+
+  @override
+  void dispose() {
+    for (var sub in _subs) { sub.cancel(); }
+    super.dispose();
+  }
+
+  void _listenToMarkers() {
+    _listenToCategory("locations", "Taxi", Icons.local_taxi, Colors.orange);
+    _listenToCategory("locations", "Bus", Icons.directions_bus, Colors.blue);
+    _listenToCategory("locations", "Hotel", Icons.hotel, Colors.purple);
+    _listenToCategory("locations", "Pharmacy", Icons.local_pharmacy, Colors.red);
+    _listenToCategory("locations", "Hospital", Icons.local_hospital, Colors.red);
+    _listenToCategory("locations", "Eco-Shine", Icons.wb_sunny, Colors.green);
+  }
+
+  void _listenToCategory(String collection, String category, IconData icon, Color color) {
+    final sub = FirebaseFirestore.instance.collection(collection)
+        .where("category", isEqualTo: category)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _markers[category] = snap.docs.map((doc) {
+          final data = doc.data();
+          return Marker(
+            point: LatLng((data['latitude'] ?? 0.0).toDouble(), (data['longitude'] ?? 0.0).toDouble()),
+            width: 40, height: 40,
+            child: GestureDetector(
+              onTap: () => _showMarkerInfo(data['name'] ?? category),
+              child: Icon(icon, color: color, size: 30),
+            ),
+          );
+        }).toList();
+      });
+    });
+    _subs.add(sub);
+  }
+
+
 
   Future<void> _determinePosition() async {
     setState(() => _isLoading = true);
@@ -117,21 +142,9 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    _categoryMarkers.forEach((category, list) {
+    _markers.forEach((category, list) {
       if (_selectedFilters.contains(category)) {
-        for (var m in list) {
-          markers.add(
-            Marker(
-              point: m['point'],
-              width: 40,
-              height: 40,
-              child: GestureDetector(
-                onTap: () => _showMarkerInfo(m['name']),
-                child: Icon(m['icon'], color: m['color'], size: 30),
-              ),
-            ),
-          );
-        }
+        markers.addAll(list);
       }
     });
 
@@ -167,7 +180,7 @@ class _MapScreenState extends State<MapScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
-                children: _selectedFilters.union(_categoryMarkers.keys.toSet()).map((category) {
+                children: _selectedFilters.union(_markers.keys.toSet()).map((category) {
                   final isSelected = _selectedFilters.contains(category);
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -183,7 +196,7 @@ class _MapScreenState extends State<MapScreen> {
                           }
                         });
                       },
-                      selectedColor: const Color(0xFF2E7D32).withOpacity(0.3),
+                      selectedColor: const Color(0xFF2E7D32).withValues(alpha: 0.3),
                       checkmarkColor: const Color(0xFF2E7D32),
                     ),
                   );
@@ -201,7 +214,7 @@ class _MapScreenState extends State<MapScreen> {
             left: 20,
             right: 20,
             child: Card(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               child: Padding(
                 padding: const EdgeInsets.all(10.0),
                 child: Text(

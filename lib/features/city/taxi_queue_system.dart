@@ -31,7 +31,7 @@ class _TaxiQueueScreenState extends State<TaxiQueueScreen> {
               onPressed: _isWaiting ? null : () async {
                 setState(() => _isWaiting = true);
                 await CityPlatformService().joinTaxiQueue(_plateController.text);
-                if (mounted) {
+                if (context.mounted) {
                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Successfully joined the queue!')));
                 }
               },

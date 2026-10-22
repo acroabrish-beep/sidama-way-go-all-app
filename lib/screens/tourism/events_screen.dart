@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../../models/tourism_models.dart';
+import '../../models/user_model.dart';
+import '../../providers/auth_provider.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -22,7 +24,8 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    bool isAdmin = FirebaseAuth.instance.currentUser?.email == "acroabrish@gmail.com";
+    final role = Provider.of<AuthProvider>(context, listen: false).userModel?.role;
+    final bool isAdmin = role == UserRole.superAdmin || role == UserRole.tourismAdmin;
 
     return Scaffold(
       appBar: AppBar(

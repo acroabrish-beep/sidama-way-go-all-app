@@ -10,7 +10,7 @@ class NotificationService {
     required String type,
     String? referenceId,
   }) async {
-    await _db.collection('user_notifications').add({
+    final payload = {
       'userId': userId,
       'title': title,
       'message': message,
@@ -18,6 +18,8 @@ class NotificationService {
       'referenceId': referenceId,
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
+    await _db.collection('notifications').add(payload);
+    await _db.collection('user_notifications').add(payload);
   }
 }

@@ -3,6 +3,9 @@ import 'base_api_service.dart';
 import '../../core/utils/logger.dart';
 
 class AIApiService extends BaseApiService {
+  static const String unavailableMessage = 'AI is temporarily unavailable.';
+  static const Duration _timeout = Duration(seconds: 12);
+
   Future<String> sendMessage({
     required String message,
     List<Map<String, String>> history = const [],
@@ -15,6 +18,7 @@ class AIApiService extends BaseApiService {
     try {
       final response = await post(
         '/api/gemini',
+        timeout: _timeout,
         body: {
           'message': message,
           'history': history,
@@ -27,14 +31,32 @@ class AIApiService extends BaseApiService {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final data =
+            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
         final text = data['response'];
         if (text is! String || text.trim().isEmpty) {
-          throw ApiException('The AI service returned an empty response.');
+          throw ApiException(unavailableMessage, code: 'ai_unavailable');
         }
         return text;
       }
-      throw ApiException('Failed to get AI response (${response.statusCode}).');
+      throw ApiException(
+        'Failed to get AI response (${response.statusCode}).',
+        statusCode: response.statusCode,
+      );
+    } on ApiException catch (e) {
+      if (e.code == 'ai_unavailable' ||
+          e.code == 'network_timeout' ||
+          e.statusCode == 503) {
+        AppLogger.error('AI request failed', error: e);
+        throw ApiException(
+          unavailableMessage,
+          statusCode: e.statusCode,
+          code: 'ai_unavailable',
+          originalError: e,
+        );
+      }
+      AppLogger.error('Send message failed', error: e);
+      rethrow;
     } catch (e) {
       AppLogger.error('Send message failed', error: e);
       rethrow;

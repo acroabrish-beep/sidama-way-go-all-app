@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../services/ai_service.dart';
+import '../services/api/ai_api_service.dart';
 import '../services/api/base_api_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/taxi_demo_provider.dart';
@@ -33,7 +34,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   void _addWelcomeMessage() {
     _messages.add({
       'role': 'assistant',
-      'text': '🌍 Selam! I\'m your Hawassa City AI Assistant.\n\nI can help you with:\n🚌 Bus tickets & routes\n🚕 City taxi fares\n🏨 Hotel bookings\n🍽️ Food & restaurants\n🚨 Emergency services\n🗺️ Tourist attractions\n☀️ Eco-Shine stations\n💊 Pharmacy info\n\nAsk me anything about Hawassa! You can also speak in Amharic or Sidaamu Afoo.',
+      'text':
+          '🌍 Selam! I\'m the Sidama Way Go assistant.\n\nI answer from live system data about:\n🚉 Stations and routes\n💰 Official fares and their source\n🚕 Station queues\n🎫 Your recent tickets\n📝 Your citizen reports\n\nI am read-only: I cannot buy, cancel or verify tickets, or change reports. You can also ask in Amharic or Sidaamu Afoo.',
     });
   }
 
@@ -49,24 +51,32 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     _scrollToBottom();
 
     final taxiDemo = Provider.of<TaxiDemoProvider>(context, listen: false);
-    
+
     // DEMO MODE: Intercept taxi queries for immediate response
     if (taxiDemo.status != DemoRideStatus.idle) {
       final lowercaseText = text.toLowerCase();
-      
-      if ((lowercaseText.contains('where') || lowercaseText.contains('location')) && 
-          (lowercaseText.contains('taxi') || lowercaseText.contains('cab') || lowercaseText.contains('ride'))) {
-        
-        String statusText = "is being matched.";
-        if (taxiDemo.status == DemoRideStatus.matched) statusText = "has been found and is ready for you.";
-        if (taxiDemo.status == DemoRideStatus.approaching) statusText = "is on the way to pick you up.";
-        if (taxiDemo.status == DemoRideStatus.arrived) statusText = "has arrived at your location!";
-        if (taxiDemo.status == DemoRideStatus.inProgress) statusText = "is currently in transit to ${taxiDemo.destination?.name}.";
-        if (taxiDemo.status == DemoRideStatus.completed) statusText = "has successfully completed the trip.";
-        
-        final response = "Your taxi (${taxiDemo.selectedTaxi?.id ?? 'N/A'}) $statusText " + 
-                        (taxiDemo.status != DemoRideStatus.completed ? "Current ETA is ${taxiDemo.etaMinutes} minutes." : "");
-        
+
+      if ((lowercaseText.contains('where') ||
+              lowercaseText.contains('location')) &&
+          (lowercaseText.contains('taxi') ||
+              lowercaseText.contains('cab') ||
+              lowercaseText.contains('ride'))) {
+        final statusText = switch (taxiDemo.status) {
+          DemoRideStatus.matched => 'has been found and is ready for you.',
+          DemoRideStatus.approaching => 'is on the way to pick you up.',
+          DemoRideStatus.arrived => 'has arrived at your location!',
+          DemoRideStatus.inProgress =>
+            'is currently in transit to ${taxiDemo.destination?.name}.',
+          DemoRideStatus.completed => 'has successfully completed the trip.',
+          _ => 'is being matched.',
+        };
+
+        final eta = taxiDemo.status != DemoRideStatus.completed
+            ? ' Current ETA is ${taxiDemo.etaMinutes} minutes.'
+            : '';
+        final response =
+            'DEMO: Your taxi (${taxiDemo.selectedTaxi?.id ?? 'N/A'}) $statusText$eta';
+
         setState(() {
           _messages.add({'role': 'assistant', 'text': response});
           _isLoading = false;
@@ -76,12 +86,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         return;
       }
 
-      if ((lowercaseText.contains('how much') || lowercaseText.contains('fare') || lowercaseText.contains('price') || lowercaseText.contains('cost')) && 
-          (lowercaseText.contains('taxi') || lowercaseText.contains('ride') || lowercaseText.contains('trip') || lowercaseText.contains('piazza'))) {
-        
+      if ((lowercaseText.contains('how much') ||
+              lowercaseText.contains('fare') ||
+              lowercaseText.contains('price') ||
+              lowercaseText.contains('cost')) &&
+          (lowercaseText.contains('taxi') ||
+              lowercaseText.contains('ride') ||
+              lowercaseText.contains('trip') ||
+              lowercaseText.contains('piazza'))) {
         final dest = taxiDemo.destination?.name ?? "your destination";
-        final response = "The estimated fare for your trip to $dest is ${taxiDemo.estimatedFare.toStringAsFixed(0)} ETB.";
-        
+        final response =
+            "DEMO: The estimated fare for your trip to $dest is ${taxiDemo.estimatedFare.toStringAsFixed(0)} ETB.";
+
         setState(() {
           _messages.add({'role': 'assistant', 'text': response});
           _isLoading = false;
@@ -90,12 +106,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         await _tts.speak(response);
         return;
       }
-      
-      if (lowercaseText.contains('arrived') && (lowercaseText.contains('taxi') || lowercaseText.contains('my'))) {
-        final response = taxiDemo.status == DemoRideStatus.arrived 
-            ? "Yes, your taxi has arrived and is waiting for you at the pickup point."
-            : "No, your taxi is still ${taxiDemo.distanceRemainingKm.toStringAsFixed(1)} km away. ETA: ${taxiDemo.etaMinutes} min.";
-            
+
+      if (lowercaseText.contains('arrived') &&
+          (lowercaseText.contains('taxi') || lowercaseText.contains('my'))) {
+        final response = taxiDemo.status == DemoRideStatus.arrived
+            ? "DEMO: Yes, your taxi has arrived and is waiting for you at the pickup point."
+            : "DEMO: No, your taxi is still ${taxiDemo.distanceRemainingKm.toStringAsFixed(1)} km away. ETA: ${taxiDemo.etaMinutes} min.";
+
         setState(() {
           _messages.add({'role': 'assistant', 'text': response});
           _isLoading = false;
@@ -107,13 +124,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
 
     final aiService = NextJSAIServiceImpl();
-    
+
     // Inject Taxi Demo Context for general AI awareness
     String systemContext = "";
     if (taxiDemo.status != DemoRideStatus.idle) {
-      systemContext = " [CONTEXT: User is currently in a Public Taxi Demo. Status: ${taxiDemo.status.name}. " +
-                     "Pickup: ${taxiDemo.pickup?.name}, Destination: ${taxiDemo.destination?.name}, " +
-                     "Taxi: ${taxiDemo.selectedTaxi?.id}, Fare: ${taxiDemo.estimatedFare} ETB.]";
+      systemContext =
+          ' [DEMO CONTEXT: User is currently in a Public Taxi Demo. Status: ${taxiDemo.status.name}. '
+          'Pickup: ${taxiDemo.pickup?.name}, Destination: ${taxiDemo.destination?.name}, '
+          'Taxi: ${taxiDemo.selectedTaxi?.id}, Fare: ${taxiDemo.estimatedFare} ETB.]';
     }
 
     // The backend expects history to start with a 'user' message.
@@ -132,11 +150,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     String response;
     try {
-      response = await aiService.chat(systemContext + text, _selectedLang, history: history);
+      response = await aiService.chat(
+        systemContext + text,
+        _selectedLang,
+        history: history,
+      );
     } catch (e) {
       final message = e is ApiException
           ? e.message
-          : 'The AI service is currently unavailable. Please try again later.';
+          : AIApiService.unavailableMessage;
       setState(() {
         _messages.add({'role': 'assistant', 'text': message});
         _isLoading = false;
@@ -194,7 +216,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       backgroundColor: const Color(0xFFF0F4F0),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1B5E20),
-        title: const Text('AI Assistant', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'AI Assistant',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           // Language selector
@@ -220,14 +245,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _quickBtn('🚌 Bus Routes'),
-                  _quickBtn('🚕 Taxi Fares'),
-                  _quickBtn('🏨 Hotels'),
-                  _quickBtn('🗺️ Tourist Spots'),
-                  _quickBtn('🚨 Emergency'),
-                  _quickBtn('☀️ Eco-Shine'),
-                  _quickBtn('💊 Pharmacy'),
-                  _quickBtn('🍽️ Food'),
+                  _quickBtn('🚉 Stations'),
+                  _quickBtn('🚌 Routes'),
+                  _quickBtn('💰 Fares'),
+                  _quickBtn('🚕 Queues'),
+                  _quickBtn('🎫 My tickets'),
+                  _quickBtn('📝 My reports'),
                 ],
               ),
             ),
@@ -260,14 +283,21 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: _selectedLang == 'am' ? 'ጠይቅ...' : _selectedLang == 'sid' ? 'Woy...' : 'Ask about Hawassa...',
+                      hintText: _selectedLang == 'am'
+                          ? 'ጠይቅ...'
+                          : _selectedLang == 'sid'
+                          ? 'Woy...'
+                          : 'Ask about Hawassa...',
                       filled: true,
                       fillColor: const Color(0xFFF0F4F0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
                     onSubmitted: (_) => _sendMessage(),
                     maxLines: null,
@@ -279,9 +309,13 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   onLongPressStart: (_) => _startListening(),
                   onLongPressEnd: (_) => _stopListening(),
                   child: CircleAvatar(
-                    backgroundColor: _isListening ? Colors.red : Colors.grey[300],
-                    child: Icon(_isListening ? Icons.mic : Icons.mic_none,
-                        color: _isListening ? Colors.white : Colors.grey[700]),
+                    backgroundColor: _isListening
+                        ? Colors.red
+                        : Colors.grey[300],
+                    child: Icon(
+                      _isListening ? Icons.mic : Icons.mic_none,
+                      color: _isListening ? Colors.white : Colors.grey[700],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -312,12 +346,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           color: isSelected ? Colors.white : Colors.white24,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(label,
-            style: TextStyle(
-              color: isSelected ? const Color(0xFF1B5E20) : Colors.white,
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            )),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF1B5E20) : Colors.white,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -325,7 +361,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _quickBtn(String label) {
     return GestureDetector(
       onTap: () {
-        _controller.text = label.substring(2); // Remove emoji
+        _controller.text = label.split(' ').skip(1).join(' ');
         _sendMessage();
       },
       child: Container(
@@ -334,9 +370,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFE8F5E9),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.3)),
+          border: Border.all(
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+          ),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF1B5E20))),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF1B5E20)),
+        ),
       ),
     );
   }
@@ -344,19 +385,29 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget _buildMessageBubble(String text, bool isUser) {
     return Padding(
       padding: EdgeInsets.only(
-        top: 4, bottom: 4,
+        top: 4,
+        bottom: 4,
         left: isUser ? 48 : 0,
         right: isUser ? 0 : 48,
       ),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
             CircleAvatar(
               radius: 16,
               backgroundColor: const Color(0xFF2E7D32),
-              child: const Text('AI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'AI',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -364,18 +415,28 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             child: GestureDetector(
               onTap: () async {
                 // Tap message to speak it
-                await _tts.setLanguage(_selectedLang == 'am' ? 'am-ET' : 'en-US');
+                await _tts.setLanguage(
+                  _selectedLang == 'am' ? 'am-ET' : 'en-US',
+                );
                 await _tts.speak(text);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isUser ? const Color(0xFF2E7D32) : Colors.white,
                   borderRadius: BorderRadius.circular(16).copyWith(
                     bottomRight: isUser ? const Radius.circular(4) : null,
                     bottomLeft: isUser ? null : const Radius.circular(4),
                   ),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                    ),
+                  ],
                 ),
                 child: Text(
                   text,
@@ -401,7 +462,14 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           const CircleAvatar(
             radius: 16,
             backgroundColor: Color(0xFF2E7D32),
-            child: Text('AI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+            child: Text(
+              'AI',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Container(
@@ -409,22 +477,37 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 4,
+                ),
+              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Thinking', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                const Text(
+                  'Thinking',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
                 const SizedBox(width: 6),
                 SizedBox(
                   width: 24,
                   height: 16,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(3, (i) => Container(
-                      width: 5, height: 5,
-                      decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle),
-                    )),
+                    children: List.generate(
+                      3,
+                      (i) => Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                          color: Colors.grey,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

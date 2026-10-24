@@ -59,7 +59,6 @@ class _CitizenReportingScreenState extends State<CitizenReportingScreen> {
   @override
   void dispose() {
     _realtime?.dispose();
-    _apiService.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -79,8 +78,7 @@ class _CitizenReportingScreenState extends State<CitizenReportingScreen> {
     }
 
     final service = RealtimeService<ReportsPage>(
-      fetch: () =>
-          _apiService.getMyReports(firebaseUid: uid, updatedSince: _since),
+      fetch: () => _apiService.getMyReports(updatedSince: _since),
       onData: (page) {
         if (!mounted) return;
         setState(() {
@@ -208,7 +206,6 @@ class _CitizenReportingScreenState extends State<CitizenReportingScreen> {
 
       // Create report via API
       await _apiService.createReport(
-        firebaseUid: user.uid,
         category: normalizedCategory,
         description: _descriptionController.text.trim(),
         photoUrl: uploadedPhotoUrl,

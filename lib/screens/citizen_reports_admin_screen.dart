@@ -40,7 +40,6 @@ class _CitizenReportsAdminScreenState extends State<CitizenReportsAdminScreen> {
   @override
   void dispose() {
     _realtime?.dispose();
-    _api.dispose();
     super.dispose();
   }
 
@@ -60,7 +59,6 @@ class _CitizenReportsAdminScreenState extends State<CitizenReportsAdminScreen> {
 
     final service = RealtimeService<ReportsPage>(
       fetch: () => _api.getReportsForAdmin(
-        adminFirebaseUid: uid,
         status: _statusFilter,
         updatedSince: _since,
       ),

@@ -1,6 +1,7 @@
-import 'dart:convert';
+import 'dart:async';
 
-import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/citizen_report_model.dart';
 import 'base_api_service.dart';
@@ -12,94 +13,191 @@ class ReportsPage {
   final DateTime serverTime;
 }
 
-class CitizenReportingApiService extends BaseApiService {
-  Map<String, dynamic> _json(http.Response response) {
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    if (decoded is Map<String, dynamic>) return decoded;
-    throw ApiException('Unexpected server response');
-  }
+class CitizenReportingApiService {
+  static const _table = 'citizen_reports';
+  static const _listLimit = 200;
+  static const _timeout = Duration(seconds: 30);
 
-  CitizenReport _report(Map<String, dynamic> data) {
-    final report = data['report'];
-    if (report is! Map<String, dynamic>) {
-      throw ApiException('The server did not return the saved report.');
+  SupabaseClient get _client => Supabase.instance.client;
+
+  String _requireUid() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      throw ApiException(
+        'Sign in to continue.',
+        statusCode: 401,
+        code: 'not_authenticated',
+      );
     }
-    return CitizenReport.fromMap(report, report['id'].toString());
+    return uid;
   }
 
-  ReportsPage _page(Map<String, dynamic> data) {
-    final rawReports = data['reports'];
-    final reports = rawReports is List
-        ? rawReports
-              .whereType<Map<String, dynamic>>()
-              .map((item) => CitizenReport.fromMap(item, item['id'].toString()))
-              .toList(growable: false)
-        : const <CitizenReport>[];
-    final serverTime = DateTime.tryParse(data['serverTime']?.toString() ?? '');
-    return ReportsPage(
-      reports: reports,
-      serverTime: (serverTime ?? DateTime.now()).toUtc(),
-    );
+  CitizenReport _report(Map<String, dynamic> row) {
+    final id = row['id']?.toString();
+    if (id == null || id.isEmpty) {
+      throw ApiException(
+        'The saved report could not be read.',
+        code: 'invalid_response',
+      );
+    }
+    return CitizenReport.fromMap(row, id);
+  }
+
+  DateTime _nextWatermark(List<CitizenReport> reports, DateTime? previous) {
+    if (reports.isEmpty) {
+      return previous?.toUtc() ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+    var latest = reports.first.updatedAt.toUtc();
+    for (final report in reports.skip(1)) {
+      final updated = report.updatedAt.toUtc();
+      if (updated.isAfter(latest)) latest = updated;
+    }
+    return latest;
+  }
+
+  ApiException _failure(PostgrestException error, String action) {
+    switch (error.code) {
+      case '42501':
+        return ApiException(
+          'You do not have permission to $action.',
+          code: error.code,
+          originalError: error,
+        );
+      case '23503':
+        return ApiException(
+          'Your account is not ready yet. Sign in again and retry.',
+          code: error.code,
+          originalError: error,
+        );
+      case '23514':
+        return ApiException(
+          'Some report details are not valid.',
+          code: error.code,
+          originalError: error,
+        );
+      default:
+        return ApiException(
+          'Could not $action. Please try again.',
+          code: error.code,
+          originalError: error,
+        );
+    }
   }
 
   Future<CitizenReport> createReport({
-    required String firebaseUid,
     required String category,
     String? description,
     String? photoUrl,
     required double latitude,
     required double longitude,
   }) async {
-    final response = await post(
-      '/api/citizen-reporting',
-      body: {
-        'firebaseUid': firebaseUid,
-        'category': category,
-        'latitude': latitude,
-        'longitude': longitude,
-        if (description != null && description.isNotEmpty)
-          'description': description,
-        if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
-      },
-    );
-    if (response.statusCode != 201) {
+    final uid = _requireUid();
+    final trimmedDescription = description?.trim();
+    final trimmedPhotoUrl = photoUrl?.trim();
+
+    if (trimmedPhotoUrl != null &&
+        trimmedPhotoUrl.isNotEmpty &&
+        (trimmedPhotoUrl.length > 2048 ||
+            !trimmedPhotoUrl.startsWith('https://'))) {
       throw ApiException(
-        'Failed to create report: ${response.statusCode}',
-        statusCode: response.statusCode,
+        'The photo URL is not valid.',
+        code: 'invalid_photo_url',
       );
     }
-    return _report(_json(response));
+
+    try {
+      final row = await _client
+          .from(_table)
+          .insert({
+            'reporter_firebase_uid': uid,
+            'category': category,
+            'latitude': latitude,
+            'longitude': longitude,
+            if (trimmedDescription != null && trimmedDescription.isNotEmpty)
+              'description': trimmedDescription,
+            if (trimmedPhotoUrl != null && trimmedPhotoUrl.isNotEmpty)
+              'photo_url': trimmedPhotoUrl,
+          })
+          .select()
+          .single()
+          .timeout(_timeout);
+      return _report(row);
+    } on PostgrestException catch (error) {
+      throw _failure(error, 'submit this report');
+    } on TimeoutException {
+      throw ApiException(
+        'Submitting the report timed out. Please try again.',
+        code: 'network_timeout',
+      );
+    }
   }
 
-  Future<ReportsPage> getMyReports({
-    required String firebaseUid,
-    DateTime? updatedSince,
-  }) async {
-    final response = await get(
-      '/api/citizen-reporting',
-      queryParams: {
-        'firebaseUid': firebaseUid,
-        'updatedSince': ?updatedSince?.toUtc().toIso8601String(),
-      },
-    );
-    return _page(_json(response));
+  Future<ReportsPage> getMyReports({DateTime? updatedSince}) async {
+    final uid = _requireUid();
+
+    try {
+      var query = _client
+          .from(_table)
+          .select()
+          .eq('reporter_firebase_uid', uid);
+      if (updatedSince != null) {
+        query = query.gt('updated_at', updatedSince.toUtc().toIso8601String());
+      }
+      final rows = await query
+          .order('created_at', ascending: false)
+          .limit(_listLimit)
+          .timeout(_timeout);
+      final reports = rows.map(_report).toList(growable: false);
+
+      // The database clock owns updated_at, so the newest value seen is a
+      // safe watermark for the next incremental fetch.
+      return ReportsPage(
+        reports: reports,
+        serverTime: _nextWatermark(reports, updatedSince),
+      );
+    } on PostgrestException catch (error) {
+      throw _failure(error, 'load your reports');
+    } on TimeoutException {
+      throw ApiException(
+        'Loading your reports timed out. Please try again.',
+        code: 'network_timeout',
+      );
+    }
   }
 
   Future<ReportsPage> getReportsForAdmin({
-    required String adminFirebaseUid,
     String? status,
     DateTime? updatedSince,
   }) async {
-    final response = await get(
-      '/api/citizen-reporting',
-      queryParams: {
-        'admin': 'true',
-        'adminFirebaseUid': adminFirebaseUid,
-        'status': ?status,
-        'updatedSince': ?updatedSince?.toUtc().toIso8601String(),
-      },
-    );
-    return _page(_json(response));
+    _requireUid();
+
+    try {
+      var query = _client.from(_table).select();
+      if (status != null) {
+        query = query.eq('status', status);
+      }
+      if (updatedSince != null) {
+        query = query.gt('updated_at', updatedSince.toUtc().toIso8601String());
+      }
+      final rows = await query
+          .order('created_at', ascending: false)
+          .limit(_listLimit)
+          .timeout(_timeout);
+      final reports = rows.map(_report).toList(growable: false);
+
+      return ReportsPage(
+        reports: reports,
+        serverTime: _nextWatermark(reports, updatedSince),
+      );
+    } on PostgrestException catch (error) {
+      throw _failure(error, 'load reports');
+    } on TimeoutException {
+      throw ApiException(
+        'Loading reports timed out. Please try again.',
+        code: 'network_timeout',
+      );
+    }
   }
 
   Future<CitizenReport> updateReport({
@@ -108,15 +206,57 @@ class CitizenReportingApiService extends BaseApiService {
     String? finalCategory,
     String? finalUrgency,
   }) async {
-    final response = await patch(
-      '/api/citizen-reporting',
-      body: {
-        'reportId': reportId,
-        'status': ?status,
-        'finalCategory': ?finalCategory,
-        'finalUrgency': ?finalUrgency,
-      },
-    );
-    return _report(_json(response));
+    _requireUid();
+
+    if (status == null && finalCategory == null && finalUrgency == null) {
+      throw ApiException(
+        'Choose a status or category to update.',
+        code: 'invalid_request',
+      );
+    }
+
+    final updates = <String, dynamic>{};
+    if (status != null) {
+      updates['status'] = status;
+      final now = DateTime.now().toUtc().toIso8601String();
+      if (status == 'in_progress') {
+        updates['assigned_at'] = now;
+      }
+      if (status == 'resolved') {
+        updates['resolved_at'] = now;
+      }
+    }
+    if (finalCategory != null) {
+      updates['final_category'] = finalCategory;
+    }
+    if (finalUrgency != null) {
+      updates['final_urgency'] = finalUrgency;
+    }
+
+    try {
+      final row = await _client
+          .from(_table)
+          .update(updates)
+          .eq('id', reportId)
+          .select()
+          .maybeSingle()
+          .timeout(_timeout);
+
+      if (row == null) {
+        throw ApiException(
+          'Report not found or you do not have permission to update it.',
+          statusCode: 404,
+          code: 'not_found',
+        );
+      }
+      return _report(row);
+    } on PostgrestException catch (error) {
+      throw _failure(error, 'update this report');
+    } on TimeoutException {
+      throw ApiException(
+        'Updating the report timed out. Please try again.',
+        code: 'network_timeout',
+      );
+    }
   }
 }

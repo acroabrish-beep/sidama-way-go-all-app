@@ -24,18 +24,20 @@ class ApiException implements Exception {
   bool get isUnauthorized => statusCode == 401;
   bool get isForbidden => statusCode == 403;
   bool get isNotFound => statusCode == 404;
+  bool get isTimeout => code == 'network_timeout';
+  bool get isNetworkUnavailable => code == 'network_unavailable';
 
   @override
   String toString() => message;
 }
 
 class BaseApiService {
-  final String _baseUrl;
+  // Resolved on first request so a release build without API_BASE_URL can
+  // still boot and use Supabase-backed auth.
+  late final String _baseUrl = AppConfig.apiBaseUrl;
   final http.Client _client;
 
-  BaseApiService({http.Client? client})
-    : _baseUrl = AppConfig.apiBaseUrl,
-      _client = client ?? http.Client();
+  BaseApiService({http.Client? client}) : _client = client ?? http.Client();
 
   String get baseUrl => _baseUrl;
 
@@ -43,6 +45,7 @@ class BaseApiService {
     String endpoint, {
     Map<String, String>? headers,
     Map<String, dynamic>? queryParams,
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
       final uri = Uri.parse('$_baseUrl$endpoint').replace(
@@ -56,24 +59,32 @@ class BaseApiService {
       final response = await _withAuthRetry(
         (headers) => _client.get(uri, headers: headers),
         headers,
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(timeout);
 
       _logResponse(response);
       _handleResponseError(response);
       return response;
     } on TimeoutException {
-      throw ApiException('Request timeout. Please check your connection.');
+      throw ApiException(
+        'The server took too long to respond. Please try again.',
+        code: 'network_timeout',
+      );
     } on SocketException {
       throw ApiException(
         'Cannot reach the server. Please check your internet or server status.',
+        code: 'network_unavailable',
       );
     } on http.ClientException catch (e) {
       if (e.message.contains('Failed to fetch')) {
         throw ApiException(
-          'Connection failed. This may be a CORS issue or the server is down.',
+          'Failed to connect to the backend. Ensure the server is running and try again.',
+          code: 'network_unavailable',
         );
       }
-      throw ApiException('Network error: ${e.message}');
+      throw ApiException(
+        'Network error: ${e.message}',
+        code: 'network_unavailable',
+      );
     } catch (e) {
       if (e is ApiException) rethrow;
       AppLogger.error('GET Request failed: $endpoint', error: e);

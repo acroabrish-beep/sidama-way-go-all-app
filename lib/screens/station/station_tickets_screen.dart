@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/logger.dart';
 import '../../models/station_ticket_models.dart';
+import '../../services/api/base_api_service.dart';
 import '../../services/api/station_ticket_api_service.dart';
 import 'destination_select_screen.dart';
 import 'station_ticket_history_screen.dart';
@@ -32,13 +33,37 @@ class _StationTicketsScreenState extends State<StationTicketsScreen> {
 
   Future<void> _refresh() async {
     final future = _api.getStations();
-    setState(() => _stationsFuture = future);
+    setState(() {
+      _stationsFuture = future;
+    });
     await future.then<void>(
       (_) {},
       onError: (Object error) {
         AppLogger.warning('Station list refresh failed: $error');
       },
     );
+  }
+
+  String _friendlyError(Object? error) {
+    if (error is ApiException) {
+      if (error.isTimeout) {
+        return 'The server took too long to respond. Check your connection and tap Try Again.';
+      }
+      if (error.isNetworkUnavailable) {
+        return 'Cannot reach the station service. Check your connection and tap Try Again.';
+      }
+      if (error.statusCode == 401) {
+        return 'Please sign in again to load stations.';
+      }
+      if (error.statusCode == 403) {
+        return 'This account does not have access to the station list.';
+      }
+      if (error.statusCode != null && error.statusCode! >= 500) {
+        return 'The station service is temporarily unavailable. Tap Try Again.';
+      }
+      return error.message;
+    }
+    return 'Could not load stations. Check your connection and tap Try Again.';
   }
 
   @override
@@ -72,7 +97,8 @@ class _StationTicketsScreenState extends State<StationTicketsScreen> {
             }
             if (snapshot.hasError) {
               return StationErrorView(
-                message: snapshot.error.toString(),
+                title: 'Unable to load stations',
+                message: _friendlyError(snapshot.error),
                 onRetry: _refresh,
               );
             }

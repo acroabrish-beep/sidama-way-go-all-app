@@ -37,7 +37,7 @@ class StationErrorView extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: const Text('Try Again'),
             ),
           ],
         ),

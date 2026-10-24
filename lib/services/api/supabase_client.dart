@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/app_config.dart';
 
@@ -12,6 +13,17 @@ class SupabaseClient {
       url: AppConfig.supabaseUrl,
       publishableKey: AppConfig.supabaseAnonKey,
       debug: AppConfig.isDevelopment,
+      // Supabase must trust Firebase as a third-party auth provider. RLS reads
+      // auth.jwt()->>'sub', which is the Firebase UID with this bridge.
+      accessToken: () async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return null;
+        try {
+          return await user.getIdToken();
+        } catch (_) {
+          return null;
+        }
+      },
     );
 
     _supabase = Supabase.instance;

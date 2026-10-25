@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import '../../utils/language_provider.dart';
-import '../../models/city_os_models.dart';
+
+import '../../models/hotel_tourism_models.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
-import 'tourist_sites_screen.dart';
-import 'tour_packages_screen.dart';
-import 'tour_guides_screen.dart';
-import 'contract_ride_screen.dart';
-import 'tour_operator_registration_screen.dart';
-import 'tour_guide_registration_screen.dart';
-import 'tourism_dashboard_screen.dart';
+import '../../services/api/base_api_service.dart';
+import '../../services/api/tourism_api_service.dart';
+import '../../utils/language_provider.dart';
+import '../../widgets/tourism_phase2_widgets.dart';
 import '../ai_assistant_screen.dart';
+import '../hotel_screen.dart';
+import 'tourism_dashboard_screen.dart';
+import 'tourist_sites_screen.dart';
 
 class TourismHomeScreen extends StatefulWidget {
   const TourismHomeScreen({super.key});
@@ -23,153 +21,106 @@ class TourismHomeScreen extends StatefulWidget {
 }
 
 class _TourismHomeScreenState extends State<TourismHomeScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TourismApiService _service = TourismApiService();
+
+  List<TourismSiteModel>? _sites;
+  List<HotelModel>? _hotels;
+  Object? _error;
+  var _loading = true;
 
   @override
   void initState() {
     super.initState();
-    // Demo seeding is debug-only.
-    if (kDebugMode) _seedInitialData();
+    _load();
   }
 
-  Future<void> _seedInitialData() async {
+  Future<void> _load() async {
     try {
-      final snapshot = await _firestore
-          .collection('tourist_sites')
-          .limit(1)
-          .get();
-      if (snapshot.docs.isEmpty) {
-        final List<Map<String, dynamic>> initialSites = [
-          {
-            "name": "Lake Hawassa",
-            "description":
-                "Beautiful rift valley lake with stunning bird life and boat rides.",
-            "category": "Nature",
-            "lat": 7.0639,
-            "lng": 38.4813,
-            "rating": 4.9,
-            "openingHours": "6:00 AM - 6:00 PM",
-            "entryFee": "Free",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Amora Gedel Park",
-            "description":
-                "Famous bird sanctuary and fish market at the lake shore.",
-            "category": "Nature",
-            "lat": 7.0639,
-            "lng": 38.4813,
-            "rating": 4.8,
-            "openingHours": "5:30 AM - 6:00 PM",
-            "entryFee": "Free",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Tabor Mountain",
-            "description":
-                "Scenic hiking trails with panoramic views of Hawassa.",
-            "category": "Adventure",
-            "lat": 7.0633,
-            "lng": 38.5183,
-            "rating": 4.7,
-            "openingHours": "6:00 AM - 6:00 PM",
-            "entryFee": "Free",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Gudumale Cultural Center",
-            "description":
-                "UNESCO heritage site for Fichee-Chambalaala Sidama New Year.",
-            "category": "Culture",
-            "lat": 7.0504,
-            "lng": 38.4955,
-            "rating": 4.8,
-            "openingHours": "8:00 AM - 5:00 PM",
-            "entryFee": "50 ETB",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Fish Market",
-            "description":
-                "Vibrant lakeside market with fresh daily Tilapia catch.",
-            "category": "Food",
-            "lat": 7.0639,
-            "lng": 38.4813,
-            "rating": 4.6,
-            "openingHours": "5:00 AM - 10:00 AM",
-            "entryFee": "Free",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Haile Resort",
-            "description":
-                "Luxury lakeside resort with pool, spa and lake views.",
-            "category": "Luxury",
-            "lat": 7.0639,
-            "lng": 38.4813,
-            "rating": 4.9,
-            "openingHours": "24 Hours",
-            "entryFee": "Free",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Millennium Park",
-            "description":
-                "Beautiful public park in the heart of Hawassa city.",
-            "category": "Nature",
-            "lat": 7.0504,
-            "lng": 38.4955,
-            "rating": 4.5,
-            "openingHours": "7:00 AM - 8:00 PM",
-            "entryFee": "20 ETB",
-            "isActive": true,
-            "images": [],
-          },
-          {
-            "name": "Sidama Cultural Village",
-            "description":
-                "Traditional homestead with local crafts and coffee ceremony.",
-            "category": "Culture",
-            "lat": 7.0504,
-            "lng": 38.5050,
-            "rating": 4.7,
-            "openingHours": "8:00 AM - 6:00 PM",
-            "entryFee": "100 ETB",
-            "isActive": true,
-            "images": [],
-          },
-        ];
-        for (var site in initialSites) {
-          await _firestore.collection('tourist_sites').add(site);
-        }
+      final (sites, hotels) = await (
+        _service.getTouristSites(),
+        _service.getHotels(),
+      ).wait;
+      if (!mounted) return;
+      setState(() {
+        _sites = sites;
+        _hotels = hotels;
+        _error = null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      if (_sites == null || _hotels == null) {
+        setState(() {
+          _error = error;
+          _loading = false;
+        });
+        return;
       }
-    } catch (e) {
-      debugPrint("Error seeding initial data: $e");
+      setState(() => _loading = false);
+      final message = error is ApiException
+          ? error.message
+          : 'Could not refresh tourism data. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
+      );
     }
+  }
+
+  void _retry() {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    _load();
+  }
+
+  Future<void> _openSites() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TouristSitesScreen()),
+    );
+    if (!mounted) return;
+    _load();
+  }
+
+  void _openNotMigrated(String module, IconData icon) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: Text(module),
+            backgroundColor: const Color(0xFF1B5E20),
+            foregroundColor: Colors.white,
+          ),
+          body: Phase2NotMigratedPanel(module: module, icon: icon),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context);
-    final role = Provider.of<AuthProvider>(context, listen: false).userModel?.role;
-    final bool isAdmin = role == UserRole.superAdmin || role == UserRole.tourismAdmin;
+    final role =
+        Provider.of<AuthProvider>(context, listen: false).userModel?.role;
+    final isAdmin =
+        role == UserRole.superAdmin || role == UserRole.tourismAdmin;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("🗺️ Hawassa Tourism"),
+        title: const Text('Hawassa Tourism'),
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.notifications), onPressed: () {}),
+          IconButton(
+            tooltip: 'Refresh tourism data',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
           if (isAdmin)
             IconButton(
+              tooltip: 'Tourism dashboard',
               icon: const Icon(Icons.dashboard),
               onPressed: () => Navigator.push(
                 context,
@@ -180,25 +131,48 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeroBanner(),
-            _buildQuickActions(context),
-            _buildSectionHeader(
-              lang.t('popular_sites'),
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TouristSitesScreen()),
-              ),
-            ),
-            _buildTouristSites(),
-            _buildSectionHeader("🎪 Events & Festivals", () => {}),
-            _buildUpcomingEvents(),
-            _buildPartnerRegistration(),
-            const SizedBox(height: 40),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeroBanner(),
+              if (_error != null && (_sites == null || _hotels == null))
+                _buildError()
+              else ...[
+                _buildQuickActions(context),
+                _buildSectionHeader(
+                  lang.t('popular_sites'),
+                  _openSites,
+                ),
+                _buildTouristSites(),
+                _buildSectionHeader('Hotels & Lodging', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HotelScreen()),
+                  );
+                }),
+                _buildHotels(),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 24, 16, 0),
+                  child: Phase2NotMigratedBanner(
+                    module: 'Events & festivals',
+                    icon: Icons.event,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Phase2NotMigratedBanner(
+                    module: 'Guide & operator registration',
+                    icon: Icons.badge,
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -208,14 +182,32 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
         ),
         backgroundColor: const Color(0xFF1B5E20),
         icon: const Icon(Icons.smart_toy, color: Colors.white),
-        label: const Text("Ask AI", style: TextStyle(color: Colors.white)),
+        label: const Text('Ask AI', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    final message = _error is ApiException
+        ? (_error as ApiException).message
+        : 'Could not load tourism data. Please try again.';
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          OutlinedButton(onPressed: _retry, child: const Text('TRY AGAIN')),
+        ],
       ),
     );
   }
 
   Widget _buildHeroBanner() {
     return Container(
-      height: 200,
+      height: 190,
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -230,25 +222,29 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Discover Hawassa",
+            'Discover Hawassa',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 32,
+              fontSize: 30,
               fontWeight: FontWeight.bold,
             ),
           ),
           const Text(
-            "Explore nature, culture & adventure",
-            style: TextStyle(color: Colors.white70, fontSize: 16),
+            'Explore nature, culture & adventure',
+            style: TextStyle(color: Colors.white70, fontSize: 15),
           ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              _buildStatChip("8 Sites"),
-              _buildStatChip("12 Guides"),
-              _buildStatChip("6 Packages"),
-              _buildStatChip("3 Events"),
+              _buildStatChip(
+                _sites == null ? 'Sites: …' : '${_sites!.length} Sites',
+              ),
+              _buildStatChip(
+                _hotels == null ? 'Hotels: …' : '${_hotels!.length} Hotels',
+              ),
+              _buildStatChip('Live Supabase data'),
             ],
           ),
         ],
@@ -277,69 +273,79 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         crossAxisCount: 2,
-        childAspectRatio: 1.2,
+        childAspectRatio: 1.25,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
         children: [
           _buildActionCard(
-            "🗺️ Tourist Sites",
+            Icons.landscape,
+            'Tourist Sites',
             Colors.green,
+            _openSites,
+          ),
+          _buildActionCard(
+            Icons.hotel,
+            'Hotels & Lodging',
+            Colors.purple,
             () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TouristSitesScreen()),
+              MaterialPageRoute(builder: (_) => const HotelScreen()),
             ),
           ),
           _buildActionCard(
-            "📦 Tour Packages",
+            Icons.inventory_2,
+            'Tour Packages',
             Colors.blue,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TourPackagesScreen()),
-            ),
+            () => _openNotMigrated('Tour Packages', Icons.inventory_2),
+            enabled: false,
           ),
           _buildActionCard(
-            "👨‍💼 Tour Guides",
+            Icons.badge,
+            'Tour Guides',
             Colors.teal,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TourGuidesScreen()),
-            ),
-          ),
-          _buildActionCard(
-            "🚗 Hire Vehicle",
-            Colors.orange,
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ContractRideScreen()),
-            ),
+            () => _openNotMigrated('Tour Guides', Icons.badge),
+            enabled: false,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionCard(String title, Color color, VoidCallback onTap) {
+  Widget _buildActionCard(
+    IconData icon,
+    String title,
+    Color color,
+    VoidCallback onTap, {
+    bool enabled = true,
+  }) {
+    final tint = enabled ? color : Colors.grey;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: tint.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: tint.withValues(alpha: 0.3)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(title.split(" ")[0], style: const TextStyle(fontSize: 32)),
+            Icon(icon, size: 34, color: tint),
             const SizedBox(height: 8),
             Text(
-              title.substring(title.indexOf(" ") + 1),
+              title,
               style: TextStyle(
-                color: color.withAlpha(200),
+                color: enabled ? color : Colors.grey.shade700,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
             ),
+            if (!enabled)
+              const Text(
+                'Phase 2 pending',
+                style: TextStyle(fontSize: 10, color: Colors.grey),
+              ),
           ],
         ),
       ),
@@ -348,7 +354,7 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
 
   Widget _buildSectionHeader(String title, VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -356,71 +362,41 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
             title,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          TextButton(onPressed: onTap, child: const Text("View All")),
+          TextButton(onPressed: onTap, child: const Text('View All')),
         ],
       ),
     );
   }
 
   Widget _buildTouristSites() {
+    if (_sites == null) {
+      return const SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_sites!.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          'No tourist sites have been published yet.',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
     return SizedBox(
-      height: 250,
-      child: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('tourist_sites')
-            .where('isActive', isEqualTo: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return const Center(child: CircularProgressIndicator());
-          final docs = snapshot.data?.docs ?? [];
-          if (docs.isEmpty) return const Center(child: Text("No sites found."));
-          return ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final site = TouristSite.fromMap(
-                docs[index].data() as Map<String, dynamic>,
-                docs[index].id,
-              );
-              return _buildSiteCard(site);
-            },
-          );
-        },
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _sites!.length,
+        itemBuilder: (context, index) => _buildSiteCard(_sites![index]),
       ),
     );
   }
 
-  Widget _buildSiteCard(TouristSite site) {
-    Color color;
-    String emoji;
-    switch (site.category) {
-      case "Nature":
-        color = Colors.green;
-        emoji = "🌿";
-        break;
-      case "Adventure":
-        color = Colors.orange;
-        emoji = "⛰️";
-        break;
-      case "Culture":
-        color = Colors.brown;
-        emoji = "🎭";
-        break;
-      case "Food":
-        color = Colors.red;
-        emoji = "🍽️";
-        break;
-      case "Luxury":
-        color = Colors.purple;
-        emoji = "🏨";
-        break;
-      default:
-        color = Colors.teal;
-        emoji = "📍";
-    }
-
+  Widget _buildSiteCard(TourismSiteModel site) {
+    final (icon, color) = _categoryVisual(site.category);
     return Container(
       width: 180,
       margin: const EdgeInsets.only(right: 16),
@@ -436,10 +412,12 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 32)),
+          Icon(icon, color: Colors.white, size: 30),
           const Spacer(),
           Text(
             site.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -452,8 +430,19 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
               const Icon(Icons.star, color: Colors.yellowAccent, size: 14),
               const SizedBox(width: 4),
               Text(
-                site.rating.toString(),
+                site.ratingLabel,
                 style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  site.categoryLabel,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                  ),
+                ),
               ),
             ],
           ),
@@ -465,22 +454,22 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              site.entryFee,
+              site.entryFeeLabel,
               style: const TextStyle(color: Colors.white, fontSize: 10),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () => _showSiteDetails(site),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: color,
                 padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 32),
+                minimumSize: const Size(0, 30),
               ),
-              child: const Text("Explore"),
+              child: const Text('Explore'),
             ),
           ),
         ],
@@ -488,116 +477,171 @@ class _TourismHomeScreenState extends State<TourismHomeScreen> {
     );
   }
 
-  Widget _buildUpcomingEvents() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('events').orderBy('date').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const Center(child: CircularProgressIndicator());
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty)
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text("No upcoming events"),
-          );
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final event = TouristEvent.fromMap(
-              docs[index].data() as Map<String, dynamic>,
-              docs[index].id,
-            );
-            return Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 5,
-                  ),
-                ],
-                border: const Border(
-                  left: BorderSide(color: Colors.blue, width: 4),
-                ),
+  void _showSiteDetails(TourismSiteModel site) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(site.name),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${site.categoryLabel} · ${site.ratingLabel} ★',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              child: ListTile(
-                title: Text(
-                  event.title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  "${event.location} • ${_formatDate(event.date)}",
-                ),
+              if (site.description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(site.description),
+              ],
+              const SizedBox(height: 8),
+              Text('Entry: ${site.entryFeeLabel}'),
+              Text(
+                'Hours: ${site.openingHours.isEmpty ? 'Not listed' : site.openingHours}',
               ),
-            );
-          },
-        );
-      },
+              if (site.address.isNotEmpty) Text('Address: ${site.address}'),
+              Text('Coordinates: ${site.coordinatesLabel}'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CLOSE'),
+          ),
+        ],
+      ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    final months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return "${months[date.month - 1]} ${date.day}, ${date.year}";
+  Widget _buildHotels() {
+    if (_hotels == null) {
+      return const SizedBox(
+        height: 140,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_hotels!.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          'No hotels have been published yet.',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+    return SizedBox(
+      height: 190,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _hotels!.length,
+        itemBuilder: (context, index) => _buildHotelCard(_hotels![index]),
+      ),
+    );
   }
 
-  Widget _buildPartnerRegistration() {
-    return Padding(
+  Widget _buildHotelCard(HotelModel hotel) {
+    final available = hotel.availableRooms.length;
+    return Container(
+      width: 240,
+      margin: const EdgeInsets.only(right: 16),
       padding: const EdgeInsets.all(16),
-      child: Row(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const TourGuideRegistrationScreen(),
+          Row(
+            children: [
+              const Icon(Icons.hotel, color: Colors.purple),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  hotel.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              child: const Text(
-                "👨‍💼 Register as Guide",
-                style: TextStyle(color: Colors.white, fontSize: 12),
-              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hotel.locationLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '★ ${hotel.ratingLabel} · $available room'
+            '${available == 1 ? '' : 's'} available',
+            style: const TextStyle(fontSize: 12),
+          ),
+          const Spacer(),
+          Text(
+            hotel.lowestAvailableRate == null
+                ? 'No rooms available'
+                : 'From ${formatAmount(hotel.lowestAvailableRate)} ETB / night',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.purple,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const TourOperatorRegistrationScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const HotelScreen()),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B5E20),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.purple,
+                side: const BorderSide(color: Colors.purple),
+                visualDensity: VisualDensity.compact,
               ),
-              child: const Text(
-                "🏢 Register as Operator",
-                style: TextStyle(color: Colors.white, fontSize: 12),
-              ),
+              child: const Text('VIEW ROOMS'),
             ),
           ),
         ],
       ),
     );
+  }
+
+  (IconData, Color) _categoryVisual(String category) {
+    switch (category) {
+      case 'natural':
+        return (Icons.landscape, Colors.green);
+      case 'historical':
+        return (Icons.account_balance, Colors.brown);
+      case 'cultural':
+        return (Icons.theater_comedy, Colors.orange);
+      case 'religious':
+        return (Icons.church, Colors.deepPurple);
+      case 'entertainment':
+        return (Icons.celebration, Colors.pink);
+      case 'shopping':
+        return (Icons.shopping_bag, Colors.blue);
+      case 'dining':
+        return (Icons.restaurant, Colors.red);
+      default:
+        return (Icons.place, Colors.teal);
+    }
   }
 }

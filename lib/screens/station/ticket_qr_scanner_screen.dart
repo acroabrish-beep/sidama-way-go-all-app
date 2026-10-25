@@ -40,7 +40,6 @@ class _TicketQrScannerScreenState extends State<TicketQrScannerScreen> {
   @override
   void dispose() {
     _controller.dispose();
-    _api.dispose();
     super.dispose();
   }
 

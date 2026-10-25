@@ -1,15 +1,157 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../models/emergency_sos_models.dart';
+import '../models/user_model.dart';
+import '../services/api/base_api_service.dart';
+import '../services/api/emergency_api_service.dart';
+import '../widgets/ai_insights_card.dart';
 import '../widgets/dashboard_base.dart';
 import '../widgets/glass_card.dart';
-import 'crud_list_screen.dart';
-import '../widgets/ai_insights_card.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../widgets/role_protected_widget.dart';
-import '../models/user_model.dart';
 
-class EmergencyDashboard extends StatelessWidget {
+class EmergencyDashboard extends StatefulWidget {
   const EmergencyDashboard({super.key});
+
+  @override
+  State<EmergencyDashboard> createState() => _EmergencyDashboardState();
+}
+
+class _EmergencyDashboardState extends State<EmergencyDashboard> {
+  final EmergencyApiService _service = EmergencyApiService();
+
+  List<EmergencyIncidentModel> _recent = const [];
+  List<EmergencyIncidentModel> _active = const [];
+  var _loading = true;
+  String? _error;
+  String? _updatingId;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        _service.listIncidents(limit: 50),
+        _service.listActiveIncidents(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _recent = results[0];
+        _active = results[1];
+        _loading = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load emergency incidents. Please try again.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _advance(EmergencyIncidentModel incident) async {
+    final nextStatus = _nextStatus(incident.status);
+    if (nextStatus == null || _updatingId != null) return;
+
+    setState(() => _updatingId = incident.id);
+    try {
+      final assigneeUid = FirebaseAuth.instance.currentUser?.uid;
+      final updated = await _service.updateStatus(
+        incidentId: incident.id,
+        status: nextStatus,
+        assigneeFirebaseUid:
+            nextStatus == 'acknowledged' || nextStatus == 'in_progress'
+            ? assigneeUid
+            : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _recent = _recent
+            .map((item) => item.id == updated.id ? updated : item)
+            .toList(growable: false);
+        _active = _active
+            .where((item) => item.id != updated.id)
+            .toList(growable: false);
+        if (updated.isActive) {
+          _active = [updated, ..._active];
+        }
+        _updatingId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Incident moved to ${updated.statusLabel}.')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _updatingId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _updatingId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update the incident. Please retry.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  String? _nextStatus(String status) {
+    switch (status) {
+      case 'reported':
+        return 'acknowledged';
+      case 'acknowledged':
+        return 'in_progress';
+      case 'in_progress':
+        return 'resolved';
+      default:
+        return null;
+    }
+  }
+
+  String? _actionLabel(String status) {
+    switch (status) {
+      case 'reported':
+        return 'ACKNOWLEDGE';
+      case 'acknowledged':
+        return 'DISPATCH';
+      case 'in_progress':
+        return 'RESOLVE';
+      default:
+        return null;
+    }
+  }
+
+  Color _actionColor(String status) {
+    switch (status) {
+      case 'reported':
+        return Colors.amber;
+      case 'acknowledged':
+        return Colors.orange;
+      default:
+        return Colors.greenAccent;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,136 +159,346 @@ class EmergencyDashboard extends StatelessWidget {
       allowedRoles: const [UserRole.superAdmin, UserRole.emergencyAdmin],
       child: DashboardBase(
         title: 'Emergency Response',
+        actions: [
+          IconButton(
+            tooltip: 'Refresh incidents',
+            onPressed: _loading ? null : _load,
+            icon: _loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
         children: [
           const Padding(
             padding: EdgeInsets.only(bottom: 16.0),
-            child: AIInsightsCard(dashboardContext: 'emergency', title: '🤖 Emergency AI Insights'),
+            child: AIInsightsCard(
+              dashboardContext: 'emergency',
+              title: '🤖 Emergency AI Insights',
+            ),
           ),
-          _buildLiveAlerts(),
-          const SizedBox(height: 24),
-          _buildActionGrid(context),
-          const SizedBox(height: 24),
           const Text(
-            'Incident Reports',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+            'Live Emergency Incidents',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Live counts from Supabase. Citizens see only their own requests; '
+            'emergency staff see every incident.',
+            style: TextStyle(fontSize: 12, color: Colors.white70),
           ),
           const SizedBox(height: 16),
-          _buildIncidentList(),
+          if (_error != null) _buildError(),
+          if (_loading && _recent.isEmpty)
+            const GlassCard(
+              height: 140,
+              child: Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            )
+          else ...[
+            _buildStats(),
+            const SizedBox(height: 20),
+            const Text(
+              'Recent Incidents',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_recent.isEmpty)
+              const GlassCard(
+                child: Text(
+                  'No emergency incidents have been reported yet.',
+                  style: TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              ..._recent.map(_buildIncidentTile),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildLiveAlerts() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('sos_requests')
-          .where('status', whereIn: ['pending', 'active'])
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const GlassCard(child: Text('Error loading alerts', style: TextStyle(color: Colors.white)));
-        }
-        int count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-        return GlassCard(
-          color: count > 0 ? Colors.red : Colors.green,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Active SOS Requests', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text('$count Active Alerts', style: const TextStyle(color: Colors.white70)),
-                ],
-              ),
-              const Icon(Icons.notifications_active, color: Colors.white, size: 40),
-            ],
+  Widget _buildError() {
+    return GlassCard(
+      color: Colors.redAccent,
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off, color: Colors.white, size: 36),
+          const SizedBox(height: 8),
+          Text(
+            _error!,
+            style: const TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh),
+            label: const Text('RETRY'),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildActionGrid(BuildContext context) {
+  Widget _buildStats() {
+    final critical = _active.where((incident) => incident.isCritical).length;
+    final awaiting = _active
+        .where((incident) => incident.status == 'reported')
+        .length;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      childAspectRatio: 3,
+      childAspectRatio: 1.9,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       children: [
-        _buildActionItem(context, 'Manage SOS', Icons.emergency, 'sos_requests', ['type', 'location_name', 'status', 'description']),
-        _buildActionItem(context, 'Incident Reports', Icons.report, 'incident_reports', ['type', 'location', 'status', 'description']),
+        _statCard(
+          'Active Requests',
+          '${_active.length}',
+          Icons.warning_amber,
+          Colors.redAccent,
+        ),
+        _statCard(
+          'Critical Active',
+          '$critical',
+          Icons.priority_high,
+          Colors.orangeAccent,
+        ),
+        _statCard(
+          'Awaiting Ack.',
+          '$awaiting',
+          Icons.pending_actions,
+          Colors.amberAccent,
+        ),
+        _statCard(
+          'Recent Loaded',
+          '${_recent.length}',
+          Icons.history,
+          Colors.lightBlueAccent,
+        ),
       ],
     );
   }
 
-  Widget _buildActionItem(BuildContext context, String title, IconData icon, String collection, List<String> fields) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CRUDListScreen(collection: collection, title: title, fields: fields))),
-      child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+  Widget _statCard(String label, String value, IconData icon, Color color) {
+    return GlassCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncidentTile(EmergencyIncidentModel incident) {
+    final (icon, color) = _typeVisual(incident.emergencyType);
+    final actionLabel = _actionLabel(incident.status);
+    final isUpdating = _updatingId == incident.id;
+
+    return GlassCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                backgroundColor: color.withValues(alpha: 0.18),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incident.typeLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (incident.incidentCode.isNotEmpty)
+                      Text(
+                        incident.incidentCode,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _statusChip(incident.statusLabel, _statusColor(incident.status)),
+            ],
+          ),
+          if (incident.description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              incident.description,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
           ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _chip(
+                incident.priorityLabel,
+                incident.isCritical ? Colors.redAccent : Colors.white70,
+              ),
+              Text(
+                incident.coordinatesLabel,
+                style: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              if (incident.createdAt != null)
+                Text(
+                  _formatDateTime(incident.createdAt!),
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+            ],
+          ),
+          if (actionLabel != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: isUpdating ? null : () => _advance(incident),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _actionColor(incident.status),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                ),
+                child: isUpdating
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        actionLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  Widget _buildIncidentList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('sos_requests').orderBy('timestamp', descending: true).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return const Center(child: Text('Error loading incidents', style: TextStyle(color: Colors.white)));
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) return const Center(child: Text('No active incidents', style: TextStyle(color: Colors.white70)));
-
-        return Column(
-          children: docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final status = data['status'] ?? 'pending';
-            return GlassCard(
-              padding: const EdgeInsets.all(8),
-              child: ListTile(
-                leading: Icon(
-                  data['type'] == 'Police' ? Icons.local_police : Icons.fire_truck,
-                  color: Colors.white,
-                ),
-                title: Text(data['type'] ?? 'Emergency', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: Text('At: ${data['location_name'] ?? 'Unknown'}\nBy: ${data['userName'] ?? 'Citizen'}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (status == 'pending')
-                      _statusButton(doc, 'dispatched', Colors.yellow),
-                    if (status == 'dispatched')
-                      _statusButton(doc, 'on scene', Colors.orange),
-                    if (status == 'on scene')
-                      _statusButton(doc, 'resolved', Colors.green),
-                    const SizedBox(width: 8),
-                    Text(status.toUpperCase(), style: const TextStyle(color: Colors.orangeAccent, fontSize: 8, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
+  Widget _chip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label, style: TextStyle(color: color, fontSize: 10)),
     );
   }
 
-  Widget _statusButton(DocumentSnapshot doc, String nextStatus, Color color) {
-    return ElevatedButton(
-      onPressed: () => doc.reference.update({'status': nextStatus}),
-      style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 8)),
-      child: Text(nextStatus.toUpperCase(), style: const TextStyle(fontSize: 8)),
-    );
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'reported':
+        return Colors.amberAccent;
+      case 'acknowledged':
+        return Colors.orangeAccent;
+      case 'in_progress':
+        return Colors.lightBlueAccent;
+      case 'resolved':
+      case 'closed':
+        return Colors.greenAccent;
+      default:
+        return Colors.white70;
+    }
+  }
+
+  (IconData, Color) _typeVisual(String type) {
+    switch (type) {
+      case 'ambulance':
+        return (Icons.local_hospital, Colors.redAccent);
+      case 'police':
+        return (Icons.local_police, Colors.lightBlueAccent);
+      case 'fire':
+        return (Icons.local_fire_department, Colors.orangeAccent);
+      case 'road_assist':
+        return (Icons.car_crash, Colors.yellowAccent);
+      default:
+        return (Icons.emergency, Colors.redAccent);
+    }
+  }
+
+  String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    String two(int part) => part.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
   }
 }

@@ -81,11 +81,78 @@ void main() {
       expect(source.contains('.delete('), isFalse);
     });
 
-    test('only the staging dev-payment helper remains on the backend', () {
-      expect(source.contains("'/api/payments/dev/complete'"), isTrue);
-      expect(source.contains("'/api/station/vehicles'"), isTrue);
-      expect(source.contains("'/api/queue'"), isTrue);
-      expect(source.contains("'/api/admin/"), isTrue);
+    test('the service no longer calls the Next.js API', () {
+      for (final route in [
+        '/api/payments/dev/complete',
+        '/api/station/vehicles',
+        '/api/queue',
+        '/api/admin/',
+        "'/api/",
+      ]) {
+        expect(source.contains(route), isFalse, reason: route);
+      }
+      expect(source.contains('BaseApiService('), isFalse);
+      expect(source.contains('package:http/http.dart'), isFalse);
+      expect(source.contains('AppConfig.apiBaseUrl'), isFalse);
+      expect(source.contains('http.Response'), isFalse);
+    });
+
+    test('the admin catalog is read directly from Supabase', () {
+      final stations = section(
+        source,
+        'Future<List<Station>> getAdminStations',
+        'Future<List<AdminRoute>> getAdminRoutes',
+      );
+      expect(stations.contains(".from('st_stations')"), isTrue);
+      expect(stations.contains(".eq('active', true)"), isFalse);
+
+      final routes = section(
+        source,
+        'Future<List<AdminRoute>> getAdminRoutes',
+        'Future<List<TariffInfo>> getAdminTariffs',
+      );
+      expect(routes.contains(".from('st_routes')"), isTrue);
+
+      final tariffs = section(
+        source,
+        'Future<List<TariffInfo>> getAdminTariffs',
+        '\n}',
+      );
+      expect(tariffs.contains(".from('st_tariffs')"), isTrue);
+      expect(tariffs.contains(".eq('route_id', routeId)"), isTrue);
+    });
+
+    test('the deferred station features are labelled Phase 5 in the UI', () {
+      final driver = read('lib/screens/station/driver_station_screen.dart');
+      expect(driver.contains('Phase 5'), isTrue);
+      expect(driver.contains('StationTicketApiService'), isFalse);
+      expect(driver.contains('_api.'), isFalse);
+
+      final metrics = read('lib/screens/station/station_metrics_overview.dart');
+      expect(metrics.contains('Phase 5'), isTrue);
+      expect(metrics.contains('StationTicketApiService'), isFalse);
+      expect(metrics.contains('_api.'), isFalse);
+      expect(metrics.contains('RealtimeService'), isFalse);
+
+      final catalog = read(
+        'lib/screens/station/admin_station_catalog_screen.dart',
+      );
+      expect(catalog.contains('Phase 5'), isTrue);
+      for (final removed in [
+        'createStation',
+        'createRoute',
+        'createTariff',
+        'importCatalog',
+      ]) {
+        expect(catalog.contains(removed), isFalse, reason: removed);
+      }
+
+      final detail = read(
+        'lib/screens/station/station_ticket_detail_screen.dart',
+      );
+      expect(detail.contains('completeDevPayment'), isFalse);
+      expect(detail.contains('/api/payments/dev/complete'), isFalse);
+      expect(detail.contains('Phase 5'), isTrue);
     });
 
     test('fares are selected by the server date rules', () {

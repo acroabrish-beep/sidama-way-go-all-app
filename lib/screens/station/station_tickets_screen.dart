@@ -25,12 +25,6 @@ class _StationTicketsScreenState extends State<StationTicketsScreen> {
     _stationsFuture = _api.getStations();
   }
 
-  @override
-  void dispose() {
-    _api.dispose();
-    super.dispose();
-  }
-
   Future<void> _refresh() async {
     final future = _api.getStations();
     setState(() {
@@ -208,9 +202,7 @@ class _StationTicketsScreenState extends State<StationTicketsScreen> {
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => const StationTicketHistoryScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const StationTicketHistoryScreen()),
         ),
       ),
     );

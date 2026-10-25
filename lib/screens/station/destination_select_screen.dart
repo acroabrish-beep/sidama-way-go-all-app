@@ -31,12 +31,6 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _api.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -201,48 +195,53 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
                   });
                 },
                 child: Column(
-                  children: destination.tariffs.map(
-                (tariff) => RadioListTile<StationVehicleType>(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  value: tariff.vehicleType,
-                  title: Row(
-                    children: [
-                      Text(tariff.vehicleType.label),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${destination.queueCounts[tariff.vehicleType] ?? 0} waiting',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
+                  children: destination.tariffs
+                      .map(
+                        (tariff) => RadioListTile<StationVehicleType>(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          value: tariff.vehicleType,
+                          title: Row(
+                            children: [
+                              Text(tariff.vehicleType.label),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${destination.queueCounts[tariff.vehicleType] ?? 0} waiting',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ETB ${tariff.fareEtb.toStringAsFixed(2)} · ${tariff.label}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: tariff.isOfficial
+                                      ? const Color(0xFF2E7D32)
+                                      : Colors.orange.shade800,
+                                ),
+                              ),
+                              if (tariff.sourceReference != null)
+                                Text(
+                                  'Ref: ${tariff.sourceReference}',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                            ],
+                          ),
+                          secondary: tariff.isOfficial
+                              ? null
+                              : const Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.orange,
+                                ),
                         ),
-                      ),
-                    ],
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ETB ${tariff.fareEtb.toStringAsFixed(2)} · ${tariff.label}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: tariff.isOfficial
-                              ? const Color(0xFF2E7D32)
-                              : Colors.orange.shade800,
-                        ),
-                      ),
-                      if (tariff.sourceReference != null)
-                        Text(
-                          'Ref: ${tariff.sourceReference}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                    ],
-                  ),
-                  secondary: tariff.isOfficial
-                      ? null
-                      : const Icon(Icons.lock_outline, color: Colors.orange),
-                ),
-                  ).toList(),
+                      )
+                      .toList(),
                 ),
               ),
           ],

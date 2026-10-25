@@ -33,12 +33,6 @@ class _TicketCheckoutScreenState extends State<TicketCheckoutScreen> {
   String? _error;
   bool _paymentsNotConfigured = false;
 
-  @override
-  void dispose() {
-    _api.dispose();
-    super.dispose();
-  }
-
   String _newIdempotencyKey() {
     final random = Random.secure().nextInt(1 << 32);
     return 'app-${DateTime.now().microsecondsSinceEpoch}-$random';
@@ -160,10 +154,7 @@ class _TicketCheckoutScreenState extends State<TicketCheckoutScreen> {
               ],
             ),
           ),
-          if (_error != null) ...[
-            const SizedBox(height: 4),
-            _buildErrorCard(),
-          ],
+          if (_error != null) ...[const SizedBox(height: 4), _buildErrorCard()],
           if (!tariff.isOfficial)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -259,18 +250,12 @@ class _TicketCheckoutScreenState extends State<TicketCheckoutScreen> {
                   children: [
                     Text(
                       widget.tariff.vehicleType.label,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
                     Text(
                       '${widget.destination.queueCounts[widget.tariff.vehicleType] ?? 0} waiting',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey,
-                      ),
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
                 ),

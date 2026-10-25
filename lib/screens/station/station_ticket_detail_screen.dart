@@ -32,7 +32,6 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
   String? _paymentError;
   bool _loading = true;
   bool _polling = false;
-  bool _completingDevPayment = false;
   bool _sharingReceipt = false;
   Timer? _pollTimer;
   Timer? _countdownTimer;
@@ -48,7 +47,6 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
-    _api.dispose();
     super.dispose();
   }
 
@@ -110,27 +108,6 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
       _pollTimer = null;
       _countdownTimer?.cancel();
       _countdownTimer = null;
-    }
-  }
-
-  Future<void> _completeDevPayment() async {
-    if (_completingDevPayment) return;
-    setState(() {
-      _completingDevPayment = true;
-      _paymentError = null;
-    });
-    try {
-      await _api.completeDevPayment(widget.ticketId);
-      await _load();
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() => _paymentError = error.message);
-    } catch (error) {
-      AppLogger.error('Dev payment completion failed', error: error);
-      if (!mounted) return;
-      setState(() => _paymentError = 'Unable to complete the dev payment.');
-    } finally {
-      if (mounted) setState(() => _completingDevPayment = false);
     }
   }
 
@@ -431,22 +408,13 @@ class _StationTicketDetailScreenState extends State<StationTicketDetailScreen> {
           ],
           const SizedBox(height: 12),
           if (isDev)
-            FilledButton.icon(
-              onPressed: _completingDevPayment ? null : _completeDevPayment,
-              icon: _completingDevPayment
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.check_circle),
-              label: const Text('Simulate successful dev payment'),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange.shade800,
-              ),
+            const StationPhase5Notice(
+              title: 'Dev payment completion is paused',
+              message:
+                  'The legacy Next.js completion endpoint has been removed. '
+                  'Phase 5 will move staging completion into a server-side '
+                  'Supabase function; production payments continue through '
+                  'the provider webhook.',
             ),
           if (payment?.checkoutUrl != null) ...[
             const SizedBox(height: 8),

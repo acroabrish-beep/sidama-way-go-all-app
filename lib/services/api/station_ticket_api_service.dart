@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/app_config.dart';
@@ -10,29 +8,7 @@ import '../../models/station_ticket_models.dart';
 import 'base_api_service.dart';
 
 class StationTicketApiService {
-  StationTicketApiService({BaseApiService? api})
-    : _api = api ?? BaseApiService();
-
-  final BaseApiService _api;
-
   SupabaseClient get _client => Supabase.instance.client;
-
-  Map<String, dynamic> _json(http.Response response) {
-    try {
-      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      if (decoded is Map<String, dynamic>) return decoded;
-    } on FormatException catch (error) {
-      throw ApiException(
-        'The server returned an unexpected response. Please try again.',
-        code: 'invalid_response',
-        originalError: error,
-      );
-    }
-    throw ApiException(
-      'The server returned an unexpected response. Please try again.',
-      code: 'invalid_response',
-    );
-  }
 
   Future<T> _withDb<T>(
     Future<T> Function() action,
@@ -466,45 +442,6 @@ class StationTicketApiService {
     return TicketDetail.fromJson(data);
   }
 
-  Future<void> completeDevPayment(String ticketId) async {
-    await _api.post('/api/payments/dev/complete', body: {'ticketId': ticketId});
-  }
-
-  Future<List<DriverVehicle>> getDriverVehicles() async {
-    final response = await _api.get('/api/station/vehicles');
-    final data = _json(response);
-    return (data['vehicles'] as List<dynamic>? ?? const [])
-        .map((item) => DriverVehicle.fromJson(item as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
-  Future<QueueSnapshot> getQueue(String stationId, {String? vehicleId}) async {
-    final response = await _api.get(
-      '/api/queue',
-      queryParams: {'stationId': stationId, 'vehicleId': ?vehicleId},
-    );
-    return QueueSnapshot.fromJson(_json(response));
-  }
-
-  Future<String> checkIn({
-    required String stationId,
-    required String vehicleId,
-  }) async {
-    final response = await _api.post(
-      '/api/queue/check-in',
-      body: {'stationId': stationId, 'vehicleId': vehicleId},
-    );
-    return _json(response)['queueId'].toString();
-  }
-
-  Future<bool> checkOut(String vehicleId) async {
-    final response = await _api.post(
-      '/api/queue/check-out',
-      body: {'vehicleId': vehicleId},
-    );
-    return _json(response)['checkedOut'] as bool? ?? false;
-  }
-
   Future<VerificationOutcome> verifyQr({
     required String qrToken,
     required String vehicleId,
@@ -527,116 +464,60 @@ class StationTicketApiService {
     return VerificationOutcome.fromJson(data);
   }
 
-  Future<StationMetrics> getTaxiMetrics() async {
-    final response = await _api.get('/api/admin/taxi/metrics');
-    return StationMetrics.fromJson(_json(response));
-  }
-
-  Future<List<Station>> getAdminStations() async {
-    final response = await _api.get('/api/admin/stations');
-    final data = _json(response);
-    return (data['stations'] as List<dynamic>? ?? const [])
-        .map((item) => Station.fromJson(item as Map<String, dynamic>))
+  Future<List<Station>> getAdminStations({
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final rows = await _withDb(
+      () => _client
+          .from('st_stations')
+          .select('id, name, name_am, lat, lng, active')
+          .order('name'),
+      'Unable to load the station catalog',
+      timeout: timeout,
+    );
+    return rows
+        .map((row) => Station.fromJson(Map<String, dynamic>.from(row)))
         .toList(growable: false);
   }
 
-  Future<String> createStation({
-    required String name,
-    String? nameAm,
-    double? lat,
-    double? lng,
+  Future<List<AdminRoute>> getAdminRoutes({
+    Duration timeout = const Duration(seconds: 15),
   }) async {
-    final response = await _api.post(
-      '/api/admin/stations',
-      body: {
-        'name': name,
-        if (nameAm != null && nameAm.trim().isNotEmpty) 'nameAm': nameAm.trim(),
-        'lat': ?lat,
-        'lng': ?lng,
+    final rows = await _withDb(
+      () => _client
+          .from('st_routes')
+          .select('id, from_station_id, to_station_id, active')
+          .order('from_station_id'),
+      'Unable to load the route catalog',
+      timeout: timeout,
+    );
+    return rows
+        .map((row) => AdminRoute.fromJson(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
+  }
+
+  Future<List<TariffInfo>> getAdminTariffs({
+    String? routeId,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final rows = await _withDb(
+      () {
+        var query = _client
+            .from('st_tariffs')
+            .select(
+              'id, route_id, vehicle_type, fare_etb, effective_from, '
+              'effective_to, source_reference, approved_by, created_by',
+            );
+        if (routeId != null) {
+          query = query.eq('route_id', routeId);
+        }
+        return query.order('effective_from', ascending: false);
       },
+      'Unable to load tariffs',
+      timeout: timeout,
     );
-    return _json(response)['stationId'].toString();
-  }
-
-  Future<List<AdminRoute>> getAdminRoutes() async {
-    final response = await _api.get('/api/admin/routes');
-    final data = _json(response);
-    return (data['routes'] as List<dynamic>? ?? const [])
-        .map((item) => AdminRoute.fromJson(item as Map<String, dynamic>))
+    return rows
+        .map((row) => TariffInfo.fromJson(Map<String, dynamic>.from(row)))
         .toList(growable: false);
-  }
-
-  Future<String> createRoute({
-    required String fromStationId,
-    required String toStationId,
-  }) async {
-    final response = await _api.post(
-      '/api/admin/routes',
-      body: {'fromStationId': fromStationId, 'toStationId': toStationId},
-    );
-    return _json(response)['routeId'].toString();
-  }
-
-  Future<List<TariffInfo>> getAdminTariffs({String? routeId}) async {
-    final response = await _api.get(
-      '/api/admin/tariffs',
-      queryParams: {'routeId': ?routeId},
-    );
-    final data = _json(response);
-    return (data['tariffs'] as List<dynamic>? ?? const [])
-        .map((item) => TariffInfo.fromJson(item as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
-  Future<String> createTariff({
-    required String routeId,
-    required StationVehicleType vehicleType,
-    required double fareEtb,
-    required String effectiveFrom,
-    required String sourceReference,
-    required String approvedBy,
-  }) async {
-    final response = await _api.post(
-      '/api/admin/tariffs',
-      body: {
-        'routeId': routeId,
-        'vehicleType': vehicleType.wireValue,
-        'fareEtb': fareEtb,
-        'effectiveFrom': effectiveFrom,
-        'sourceReference': sourceReference,
-        'approvedBy': approvedBy,
-      },
-    );
-    return _json(response)['tariffId'].toString();
-  }
-
-  Future<CatalogImportResult> importCatalog({
-    required String stationsCsv,
-    required String routesCsv,
-    required String tariffsCsv,
-    required bool commit,
-  }) async {
-    try {
-      final response = await _api.post(
-        '/api/admin/import',
-        body: {
-          'stationsCsv': stationsCsv,
-          'routesCsv': routesCsv,
-          'tariffsCsv': tariffsCsv,
-          'commit': commit,
-        },
-      );
-      return CatalogImportResult.fromJson(_json(response));
-    } on ApiException catch (error) {
-      final data = error.data;
-      if (data is Map<String, dynamic> && data['errors'] is List) {
-        return CatalogImportResult.fromJson(data);
-      }
-      rethrow;
-    }
-  }
-
-  void dispose() {
-    _api.dispose();
   }
 }

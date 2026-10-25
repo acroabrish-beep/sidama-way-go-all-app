@@ -30,12 +30,6 @@ class _StationTicketHistoryScreenState
     _load();
   }
 
-  @override
-  void dispose() {
-    _api.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
